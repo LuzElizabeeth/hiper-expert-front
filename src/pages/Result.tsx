@@ -11,7 +11,7 @@ export const Result = () => {
       <div className="screen center-screen">
         <HeartPulse size={58} />
         <h1>Sin resultado</h1>
-        <p className="muted">Primero realiza una evaluación para generar un prediagnóstico.</p>
+        <p className="muted">Primero registra una evaluación para generar una orientación inicial.</p>
 
         <Link to="/evaluacion" className="primary-button">
           Iniciar evaluación
@@ -31,7 +31,7 @@ export const Result = () => {
           )}
         </div>
 
-        <p>Prediagnóstico generado</p>
+        <p>Orientación generada</p>
         <h1>Riesgo {result.riskLevel}</h1>
         <strong>{result.score} puntos</strong>
       </section>

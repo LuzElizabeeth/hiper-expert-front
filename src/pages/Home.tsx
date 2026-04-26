@@ -39,17 +39,17 @@ export const Home = () => {
       </header>
 
       <section className="home-greeting">
-        <h1>Buenos dias</h1>
-        <p>Jueves, 24 de Octubre</p>
+        <h1>Buenos días</h1>
+        <p>Seguimiento de hipertensión</p>
       </section>
 
       <div className="home-week-pill">
         <span className="home-dot" />
-        <span>Presion controlada esta semana</span>
+        <span>Presión controlada esta semana</span>
       </div>
 
       <section className="home-pressure-card">
-        <p className="home-card-subtitle">Ultima medicion hoy 08:30 AM</p>
+        <p className="home-card-subtitle">Última medición hoy 08:30 AM</p>
         <div className="pressure-gauge">
           <div className="pressure-inner">
             <h2>128/82</h2>
@@ -60,7 +60,7 @@ export const Home = () => {
           <Heart size={16} />
           <strong>72</strong> lpm
         </p>
-        <div className="home-status-box">Tu presion esta en rango saludable</div>
+        <div className="home-status-box">Tu presión está en rango controlado</div>
       </section>
 
       {settings.aiTrends ? (
@@ -69,8 +69,8 @@ export const Home = () => {
             <Stethoscope size={16} />
           </div>
           <div>
-            <h3>Analisis de IA</h3>
-            <p>Posible perdida de adherencia nocturna. No registraste tu toma de Amlodipino ayer.</p>
+            <h3>Análisis de hipertensión</h3>
+            <p>Posible falta de adherencia nocturna. No registraste tu toma de Amlodipino ayer.</p>
           </div>
         </section>
       ) : null}
@@ -123,7 +123,7 @@ export const Home = () => {
           </span>
           <span>
             <i className="legend-dot legend-dia" />
-            Diastolica
+            DIASTÓLICA
           </span>
         </div>
       </section>
@@ -131,11 +131,11 @@ export const Home = () => {
       <section className="home-actions-grid">
         <Link to="/evaluacion" className="action-card action-primary">
           <ClipboardPlus size={22} />
-          {settings.dailyMeasurement ? 'Registrar presion' : 'Nueva medicion'}
+          {settings.dailyMeasurement ? 'Registrar presiónpresión' : 'Nueva medición'}
         </Link>
         <Link to="/medicacion" className="action-card">
           <Stethoscope size={22} />
-          Anadir medicacion
+          Añadir medicación
         </Link>
         <Link to="/historial" className="action-card">
           <History size={22} />
@@ -149,7 +149,7 @@ export const Home = () => {
 
       {!settings.criticalAlerts && !settings.aiTrends && !settings.medicationReminders ? (
         <section className="home-muted-info">
-          Varias alertas estan desactivadas. Puedes reactivarlas desde la seccion de configuracion.
+          Varias alertas están desactivadas. Puedes reactivarlas desde la sección de configuración.
         </section>
       ) : null}
 
@@ -175,7 +175,7 @@ export const Home = () => {
       {settings.healthTips ? (
         <section className="home-tip-card">
           <CalendarDays size={18} />
-          <p>Reducir el sodio ayuda a controlar tu presion arterial de forma natural.</p>
+          <p>Reducir el sodio ayuda a controlar tu presión arterial de forma natural.</p>
         </section>
       ) : null}
     </div>

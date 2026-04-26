@@ -6,48 +6,37 @@ import type {
   PressureMeasurement,
   Symptom,
 } from '../types/expert.types';
-export const cardiovascularSymptoms: Symptom[] = [
+
+export const hypertensionSymptoms: Symptom[] = [
   {
-    id: 'chest_pain',
-    label: 'Dolor u opresión en el pecho',
-    description: 'Sensación de presión, ardor o peso en el centro del pecho.',
+    id: 'headache',
+    label: 'Dolor de cabeza intenso',
+    description: 'Cefalea frecuente o fuerte, especialmente al despertar.',
+    severity: 'medium',
+  },
+  {
+    id: 'dizziness',
+    label: 'Mareo o sensación de inestabilidad',
+    description: 'Sensación de desvanecimiento, vértigo o pérdida de equilibrio.',
+    severity: 'medium',
+  },
+  {
+    id: 'blurred_vision',
+    label: 'Visión borrosa',
+    description: 'Dificultad para enfocar, ver manchas o alteraciones visuales.',
+    severity: 'high',
+  },
+  {
+    id: 'chest_pressure',
+    label: 'Presión o dolor en el pecho',
+    description: 'Molestia torácica asociada a presión arterial elevada.',
     severity: 'high',
   },
   {
     id: 'short_breath',
     label: 'Dificultad para respirar',
-    description: 'Falta de aire en reposo o con poco esfuerzo.',
+    description: 'Falta de aire en reposo o durante actividades cotidianas.',
     severity: 'high',
-  },
-  {
-    id: 'left_arm_pain',
-    label: 'Dolor en brazo izquierdo',
-    description: 'Dolor que puede extenderse hacia brazo, hombro, cuello o mandíbula.',
-    severity: 'high',
-  },
-  {
-    id: 'fatigue',
-    label: 'Fatiga inusual',
-    description: 'Cansancio extremo sin causa aparente.',
-    severity: 'medium',
-  },
-  {
-    id: 'dizziness',
-    label: 'Mareo o desmayo',
-    description: 'Sensación de pérdida de equilibrio o desvanecimiento.',
-    severity: 'medium',
-  },
-  {
-    id: 'sweating',
-    label: 'Sudoración fría',
-    description: 'Sudoración repentina, fría o excesiva.',
-    severity: 'high',
-  },
-  {
-    id: 'nausea',
-    label: 'Náuseas',
-    description: 'Malestar estomacal acompañado o no de vómito.',
-    severity: 'medium',
   },
   {
     id: 'palpitations',
@@ -55,15 +44,27 @@ export const cardiovascularSymptoms: Symptom[] = [
     description: 'Latidos rápidos, fuertes o irregulares.',
     severity: 'medium',
   },
+  {
+    id: 'nosebleed',
+    label: 'Sangrado nasal',
+    description: 'Sangrado sin causa clara, especialmente si se acompaña de presión alta.',
+    severity: 'medium',
+  },
+  {
+    id: 'fatigue',
+    label: 'Cansancio inusual',
+    description: 'Fatiga persistente o debilidad sin causa aparente.',
+    severity: 'low',
+  },
 ];
 
-export const evaluateCardiovascularRisk = async (
+export const evaluateHypertensionRisk = async (
   payload: EvaluationPayload
 ): Promise<EvaluationResult> => {
   let score = 0;
 
   payload.selectedSymptoms.forEach((symptomId) => {
-    const symptom = cardiovascularSymptoms.find((item) => item.id === symptomId);
+    const symptom = hypertensionSymptoms.find((item) => item.id === symptomId);
 
     if (symptom?.severity === 'high') score += 25;
     if (symptom?.severity === 'medium') score += 15;
@@ -76,24 +77,24 @@ export const evaluateCardiovascularRisk = async (
   if (payload.smoker) score += 10;
 
   let riskLevel: EvaluationResult['riskLevel'] = 'Bajo';
-  let diagnosis = 'No se identifican señales importantes de riesgo cardiovascular inmediato.';
+  let diagnosis = 'No se identifican señales importantes de riesgo hipertensivo inmediato.';
 
   if (score >= 35) {
     riskLevel = 'Moderado';
     diagnosis =
-      'Se identifican síntomas y factores que podrían estar relacionados con riesgo cardiovascular. Se recomienda valoración médica.';
+      'Se identifican síntomas y factores que podrían estar RELACIÓNados con riesgo hipertensivo. Se recomienda valoración médica.';
   }
 
   if (score >= 65) {
     riskLevel = 'Alto';
     diagnosis =
-      'El sistema detecta un posible riesgo cardiovascular alto. Es importante acudir a revisión médica lo antes posible.';
+      'El sistema detecta un posible riesgo hipertensivo alto. Es importante acudir a revisión médica lo antes posible.';
   }
 
   if (score >= 90) {
     riskLevel = 'Crítico';
     diagnosis =
-      'Se detectan señales de posible emergencia cardiovascular. Se recomienda buscar atención médica inmediata.';
+      'Se detectan señales compatibles con una posible crisis hipertensiva. Se recomienda buscar atención médica inmediata.';
   }
 
   const result: EvaluationResult = {
@@ -103,19 +104,19 @@ export const evaluateCardiovascularRisk = async (
     selectedSymptoms: payload.selectedSymptoms,
     createdAt: new Date().toISOString(),
     recommendations: [
-      'No automedicarse.',
-      'Registrar la hora de inicio de los síntomas.',
-      'Evitar esfuerzo físico mientras persistan los síntomas.',
-      'Consultar a un profesional de salud para una evaluación adecuada.',
-      riskLevel === 'Crítico'
-        ? 'Acudir inmediatamente a urgencias o llamar a servicios de emergencia.'
-        : 'Dar seguimiento médico preventivo si los síntomas continúan.',
-    ],
+  'No automedicarse ni suspender tratamiento sin indicación médica.',
+  'Registrar presiónla presión arterial con fecha y hora.',
+  'Evitar esfuerzo físico si hay síntomas intensos.',
+  'Reducir consumo de sal, cafeína y tabaco cuando aplique.',
+  riskLevel === 'Crítico'
+    ? 'Acudir inmediatamente a urgencias o llamar a servicios de emergencia.'
+    : 'Dar seguimiento con un profesional de salud si los síntomas continúan.',
+],
   };
 
-  const previous = localStorage.getItem('cardio-history');
+  const previous = localStorage.getItem('hypertension-history');
   const history = previous ? JSON.parse(previous) : [];
-  localStorage.setItem('cardio-history', JSON.stringify([result, ...history]));
+  localStorage.setItem('hypertension-history', JSON.stringify([result, ...history]));
 
   return new Promise((resolve) => {
     setTimeout(() => resolve(result), 700);
@@ -123,7 +124,7 @@ export const evaluateCardiovascularRisk = async (
 };
 
 export const getHistory = (): EvaluationResult[] => {
-  const data = localStorage.getItem('cardio-history');
+  const data = localStorage.getItem('hypertension-history');
   return data ? JSON.parse(data) : [];
 };
 
@@ -132,7 +133,7 @@ export const getLastResult = (): EvaluationResult | null => {
   return history.length > 0 ? history[0] : null;
 };
 
-const PRESSURE_HISTORY_KEY = 'cardio-pressure-history';
+const PRESSURE_HISTORY_KEY = 'hypertension-pressure-history';
 
 export const savePressureMeasurement = (measurement: Omit<PressureMeasurement, 'createdAt'>): void => {
   const previous = localStorage.getItem(PRESSURE_HISTORY_KEY);
@@ -151,7 +152,7 @@ export const getPressureHistory = (): PressureMeasurement[] => {
   return data ? JSON.parse(data) : [];
 };
 
-const EMERGENCY_CONTACT_KEY = 'cardio-emergency-contact';
+const EMERGENCY_CONTACT_KEY = 'hypertension-emergency-contact';
 
 export const saveEmergencyContact = (
   contact: Omit<EmergencyContact, 'updatedAt'>
@@ -174,7 +175,7 @@ export const deleteEmergencyContact = (): void => {
   localStorage.removeItem(EMERGENCY_CONTACT_KEY);
 };
 
-const NOTIFICATION_SETTINGS_KEY = 'cardio-notification-settings';
+const NOTIFICATION_SETTINGS_KEY = 'hypertension-notification-settings';
 
 export const defaultNotificationSettings: NotificationSettings = {
   criticalAlerts: true,

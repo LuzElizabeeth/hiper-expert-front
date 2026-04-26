@@ -5,16 +5,16 @@ import { savePressureMeasurement } from '../services/expertApi';
 
 export const Evaluation = () => {
   const navigate = useNavigate();
-  const [activeField, setActiveField] = useState<'sistolica' | 'diastolica'>('sistolica');
+  const [activeField, setActiveField] = useState<'sistolica' | 'DIASTÓLICA'>('sistolica');
   const [sistolica, setSistolica] = useState('120');
-  const [diastolica, setDiastolica] = useState('80');
+  const [DIASTÓLICA, setDIASTÓLICA] = useState('80');
   const [replaceOnNextTap, setReplaceOnNextTap] = useState(true);
 
   const pulse = 72;
 
   const activeValue = useMemo(
-    () => (activeField === 'sistolica' ? sistolica : diastolica),
-    [activeField, sistolica, diastolica]
+    () => (activeField === 'sistolica' ? SISTÓLICA: DIASTÓLICA),
+    [activeField, sistolica, DIASTÓLICA]
   );
 
   const updateActiveField = (nextValue: string) => {
@@ -22,7 +22,7 @@ export const Evaluation = () => {
       setSistolica(nextValue);
       return;
     }
-    setDiastolica(nextValue);
+    setDIASTÓLICA(nextValue);
   };
 
   const handleDigit = (digit: string) => {
@@ -46,20 +46,20 @@ export const Evaluation = () => {
     setReplaceOnNextTap(false);
   };
 
-  const handleFieldSelection = (field: 'sistolica' | 'diastolica') => {
+  const handleFieldSelection = (field: 'sistolica' | 'DIASTÓLICA') => {
     setActiveField(field);
     setReplaceOnNextTap(true);
   };
 
   const handleNextField = () => {
-    setActiveField((current) => (current === 'sistolica' ? 'diastolica' : 'sistolica'));
+    setActiveField((current) => (current === 'sistolica' ? 'DIASTÓLICA' : 'sistolica'));
     setReplaceOnNextTap(true);
   };
 
   const handleSaveMeasurement = () => {
     savePressureMeasurement({
       systolic: Number(sistolica),
-      diastolic: Number(diastolica),
+      diastolic: Number(DIASTÓLICA),
       pulse,
     });
 
@@ -72,7 +72,7 @@ export const Evaluation = () => {
         <button type="button" onClick={() => navigate(-1)} className="icon-button">
           <ArrowLeft size={20} />
         </button>
-        <h1>Registrar Presion</h1>
+        <h1>Registrar presiónpresión</h1>
       </div>
 
       <section className="pressure-panel">
@@ -89,11 +89,11 @@ export const Evaluation = () => {
 
           <button
             type="button"
-            className={`pressure-value ${activeField === 'diastolica' ? 'active' : ''}`}
-            onClick={() => handleFieldSelection('diastolica')}
+            className={`pressure-value ${activeField === 'DIASTÓLICA' ? 'active' : ''}`}
+            onClick={() => handleFieldSelection('DIASTÓLICA')}
           >
-            <span>DIASTOLICA</span>
-            <strong>{diastolica}</strong>
+            <span>DIASTÓLICA</span>
+            <strong>{DIASTÓLICA}</strong>
             <small>mmHg</small>
           </button>
         </div>
@@ -110,7 +110,7 @@ export const Evaluation = () => {
 
       <section className="pressure-ok-box">
         <CheckCircle2 size={18} />
-        <p>Estos valores se encuentran en el rango normal para su perfil.</p>
+        <p>Estos valores se guardarán para monitorear el control de la hipertensión.</p>
       </section>
 
       <section className="keypad-card">

@@ -104,7 +104,7 @@ export const History = () => {
           Mes
         </button>
         <button type="button" className={range === 'anio' ? 'active' : ''} onClick={() => setRange('anio')}>
-          Ano
+          Año
         </button>
       </section>
 
@@ -112,7 +112,7 @@ export const History = () => {
         <section className="empty-state">
           <ChartNoAxesCombined size={48} />
           <h2>No hay registros</h2>
-          <p>Cuando guardes una medicion aparecera aqui.</p>
+          <p>Cuando guardes una medición aparecerá aquí.</p>
         </section>
       ) : (
         <>
@@ -126,7 +126,7 @@ export const History = () => {
             </p>
 
             <div className="history-chart">
-              <svg viewBox="0 0 280 100" role="img" aria-label="Tendencia de presion">
+              <svg viewBox="0 0 280 100" role="img" aria-label="Tendencia de presión">
                 <polyline points={chartPoints.systolic} className="line-systolic" />
                 <polyline points={chartPoints.diastolic} className="line-diastolic" />
               </svg>

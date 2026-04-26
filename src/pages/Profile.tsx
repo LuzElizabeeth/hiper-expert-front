@@ -17,7 +17,7 @@ export const Profile = () => {
         </div>
 
         <h1>Ricardo García</h1>
-        <p>72 años · Paciente cardiovascular</p>
+        <p>72 años · Paciente hipertensivo</p>
 
         <div className="profile-stats">
           <div>
@@ -39,7 +39,7 @@ export const Profile = () => {
           <HeartPulse size={19} />
           <div>
             <span>Enfermedad seleccionada</span>
-            <strong>Cardiovasculares</strong>
+            <strong>Hipertensión arterial</strong>
           </div>
         </div>
 
@@ -47,7 +47,7 @@ export const Profile = () => {
           <Stethoscope size={19} />
           <div>
             <span>Objetivo del sistema</span>
-            <strong>Detección temprana de síntomas</strong>
+            <strong>Control y detección temprana de hipertensión</strong>
           </div>
         </div>
 

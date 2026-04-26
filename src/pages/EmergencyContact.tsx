@@ -60,7 +60,7 @@ export const EmergencyContact = () => {
         <button type="button" onClick={() => navigate(-1)} className="icon-button">
           <ArrowLeft size={20} />
         </button>
-        <h1>{isEditing ? 'Editar contacto' : 'Anadir contacto'}</h1>
+        <h1>{isEditing ? 'Editar contacto' : 'Añadir contacto'}</h1>
       </div>
 
       {isEditing ? (
@@ -80,21 +80,21 @@ export const EmergencyContact = () => {
 
       <section className="emergency-form-card">
         <h2>{isEditing ? 'Editar contacto de emergencia' : 'Contacto de emergencia'}</h2>
-        <p>Anade a alguien a quien se pueda contactar en caso de alertas o emergencias sanitarias.</p>
+        <p>Añade a alguien a quien se pueda contactar en caso de alertas o emergencias sanitarias.</p>
 
         <label className="medication-label">
           NOMBRE COMPLETO
           <input
             className="emergency-input"
             type="text"
-            placeholder="e.g. Sarah Miller"
+            placeholder="Ej. Ana Pérez"
             value={fullName}
             onChange={(event) => setFullName(event.target.value)}
           />
         </label>
 
         <div className="frequency-section emergency-relation">
-          <span>RELACION</span>
+          <span>RELACIÓN</span>
           <div className="relation-grid">
             {relationOptions.map((option) => (
               <button
@@ -111,7 +111,7 @@ export const EmergencyContact = () => {
         </div>
 
         <label className="medication-label">
-          NUMERO DE TELEFONO
+          NÚMERO DE TELÉFONO
           <input
             className="emergency-input"
             type="tel"
@@ -124,8 +124,8 @@ export const EmergencyContact = () => {
           <button type="button" className="photo-card" onClick={() => setHasPhoto((current) => !current)}>
             <div className="photo-avatar">{hasPhoto ? <UserRound size={22} /> : <Camera size={18} />}</div>
             <div>
-              <strong>Anade una foto</strong>
-              <p>Ayuda a identificar contactos rapidamente durante emergencias.</p>
+              <strong>Añade una foto</strong>
+              <p>Ayuda a identificar contactos rápidamente durante emergencias.</p>
             </div>
           </button>
         ) : null}
@@ -133,11 +133,11 @@ export const EmergencyContact = () => {
         <section className="alerts-card">
           <div className="alerts-header">
             <div>
-              <h3>{isEditing ? 'Health Alerts' : 'Alertas de salud'}</h3>
+              <h3>{isEditing ? 'Alertas de salud' : 'Alertas de salud'}</h3>
               <p>
                 {isEditing
-                  ? 'Automatically notify this contact if your blood pressure readings are outside safe levels.'
-                  : 'Notificar automaticamente a este contacto si sus lecturas de presion arterial estan fuera de los niveles seguros.'}
+                  ? 'Notificar automáticamente a este contacto si tus lecturas de presión arterial están fuera de los niveles seguros.'
+                  : 'Notificar automáticamente a este contacto si sus lecturas de presión arterial están fuera de los niveles seguros.'}
               </p>
             </div>
             <button

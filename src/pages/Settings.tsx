@@ -64,7 +64,7 @@ export const Settings = () => {
 
   const handleSave = () => {
     saveNotificationSettings(settings);
-    setSavedMessage('Configuracion guardada');
+    setSavedMessage('Configuración guardada');
   };
 
   return (
@@ -77,7 +77,7 @@ export const Settings = () => {
       </div>
 
       <section className="settings-hero-card">
-        <p>PERSONALIZACION</p>
+        <p>PERSONALIZACIÓN</p>
         <h2>Configura tu tranquilidad</h2>
       </section>
 
@@ -99,8 +99,8 @@ export const Settings = () => {
           Alertas de Salud
         </h2>
         <SettingRow
-          title="Alertas Criticas"
-          description="Presiones fuera de rango (Rojo/Amarillo)"
+          title="Alertas críticas"
+          description="Presión fuera de rango (Rojo/Amarillo)"
           checked={settings.criticalAlerts}
           onToggle={() => toggle('criticalAlerts')}
         />
@@ -115,7 +115,7 @@ export const Settings = () => {
       <section className="settings-group">
         <h2>
           <PillBottle size={16} />
-          Recordatorios de Medicacion
+          Recordatorios de medicación
         </h2>
         <SettingRow
           title="Toma de Medicamentos"
@@ -137,7 +137,7 @@ export const Settings = () => {
           Recordatorios de Actividad
         </h2>
         <SettingRow
-          title="Medicion Diaria"
+          title="Medición diaria"
           description="Recordatorio para tomarse la presion"
           checked={settings.dailyMeasurement}
           onToggle={() => toggle('dailyMeasurement')}
@@ -152,8 +152,8 @@ export const Settings = () => {
 
       <section className="settings-help-card">
         <div>
-          <h3>Necesitas ayuda?</h3>
-          <p>Configura alarmas personalizadas con el apoyo de tu medico de cabecera.</p>
+          <h3>¿Necesitas ayuda?</h3>
+          <p>Configura alarmas personalizadas con el apoyo de tu médico de cabecera.</p>
         </div>
         <Headset size={20} />
       </section>

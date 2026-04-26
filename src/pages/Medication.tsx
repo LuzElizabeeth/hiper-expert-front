@@ -37,12 +37,12 @@ export const Medication = () => {
         <button type="button" onClick={() => navigate(-1)} className="icon-button">
           <ArrowLeft size={20} />
         </button>
-        <h1>Anadir Medicacion</h1>
+        <h1>Añadir medicación</h1>
       </div>
 
       <section className="medication-section">
         <h2>Detalles del Tratamiento</h2>
-        <p>Complete los datos para recibir sus alertas a tiempo.</p>
+        <p>Completa los datos para recibir tus alertas a tiempo.</p>
 
         <label className="medication-label">
           NOMBRE DEL MEDICAMENTO
@@ -53,7 +53,7 @@ export const Medication = () => {
               value={medicineName}
               onChange={(event) => setMedicineName(event.target.value)}
             />
-            <button type="button" className="calendar-mini-btn" aria-label="Seleccionar medicacion">
+            <button type="button" className="calendar-mini-btn" aria-label="Seleccionar medicación">
               <CalendarClock size={15} />
             </button>
           </div>
@@ -154,7 +154,7 @@ export const Medication = () => {
 
         <button type="button" className="primary-button medication-save-btn" onClick={saveMedication}>
           <ClipboardCheck size={18} />
-          GUARDAR MEDICACION
+          GUARDAR MEDICACIÓN
         </button>
       </section>
 

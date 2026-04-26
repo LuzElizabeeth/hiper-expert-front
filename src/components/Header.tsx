@@ -4,7 +4,7 @@ type HeaderProps = {
   title?: string;
 };
 
-export const Header = ({ title = 'CardioExpert' }: HeaderProps) => {
+export const Header = ({ title = 'HiperExpert' }: HeaderProps) => {
   return (
     <header className="header">
       <div className="user-badge">
