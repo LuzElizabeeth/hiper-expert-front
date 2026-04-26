@@ -1,133 +1,145 @@
-import { useState } from 'react';
-import type { FormEvent } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save } from 'lucide-react';
-import { cardiovascularSymptoms, evaluateCardiovascularRisk } from '../services/expertApi';
-import { SymptomOption } from '../components/SymptomOption';
-import type { EvaluationPayload } from '../types/expert.types';
+import { ArrowLeft, Heart, Save, Undo2, CheckCircle2 } from 'lucide-react';
+import { savePressureMeasurement } from '../services/expertApi';
 
 export const Evaluation = () => {
   const navigate = useNavigate();
+  const [activeField, setActiveField] = useState<'sistolica' | 'diastolica'>('sistolica');
+  const [sistolica, setSistolica] = useState('120');
+  const [diastolica, setDiastolica] = useState('80');
+  const [replaceOnNextTap, setReplaceOnNextTap] = useState(true);
 
-  const [age, setAge] = useState(55);
-  const [gender, setGender] = useState('Masculino');
-  const [hasHypertension, setHasHypertension] = useState(false);
-  const [hasDiabetes, setHasDiabetes] = useState(false);
-  const [smoker, setSmoker] = useState(false);
-  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
+  const pulse = 72;
 
-  const toggleSymptom = (id: string) => {
-    setSelectedSymptoms((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
-    );
+  const activeValue = useMemo(
+    () => (activeField === 'sistolica' ? sistolica : diastolica),
+    [activeField, sistolica, diastolica]
+  );
+
+  const updateActiveField = (nextValue: string) => {
+    if (activeField === 'sistolica') {
+      setSistolica(nextValue);
+      return;
+    }
+    setDiastolica(nextValue);
   };
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
+  const handleDigit = (digit: string) => {
+    if (replaceOnNextTap) {
+      updateActiveField(digit);
+      setReplaceOnNextTap(false);
+      return;
+    }
 
-    const payload: EvaluationPayload = {
-      age,
-      gender,
-      hasHypertension,
-      hasDiabetes,
-      smoker,
-      selectedSymptoms,
-    };
+    const base = activeValue === '0' ? digit : `${activeValue}${digit}`;
+    updateActiveField(base.slice(0, 3));
+  };
 
-    setLoading(true);
-    await evaluateCardiovascularRisk(payload);
-    setLoading(false);
+  const handleDelete = () => {
+    if (activeValue.length <= 1) {
+      updateActiveField('0');
+      setReplaceOnNextTap(true);
+      return;
+    }
+    updateActiveField(activeValue.slice(0, -1));
+    setReplaceOnNextTap(false);
+  };
 
-    navigate('/resultado');
+  const handleFieldSelection = (field: 'sistolica' | 'diastolica') => {
+    setActiveField(field);
+    setReplaceOnNextTap(true);
+  };
+
+  const handleNextField = () => {
+    setActiveField((current) => (current === 'sistolica' ? 'diastolica' : 'sistolica'));
+    setReplaceOnNextTap(true);
+  };
+
+  const handleSaveMeasurement = () => {
+    savePressureMeasurement({
+      systolic: Number(sistolica),
+      diastolic: Number(diastolica),
+      pulse,
+    });
+
+    navigate('/');
   };
 
   return (
-    <form className="screen" onSubmit={handleSubmit}>
+    <div className="screen pressure-register-screen">
       <div className="page-topbar">
         <button type="button" onClick={() => navigate(-1)} className="icon-button">
           <ArrowLeft size={20} />
         </button>
-
-        <h1>Evaluación cardiovascular</h1>
+        <h1>Registrar Presion</h1>
       </div>
 
-      <section className="form-card">
-        <h2>Datos generales</h2>
+      <section className="pressure-panel">
+        <div className="pressure-values">
+          <button
+            type="button"
+            className={`pressure-value ${activeField === 'sistolica' ? 'active' : ''}`}
+            onClick={() => handleFieldSelection('sistolica')}
+          >
+            <span>SISTOLICA</span>
+            <strong>{sistolica}</strong>
+            <small>mmHg</small>
+          </button>
 
-        <label>
-          Edad
-          <input
-            type="number"
-            min="1"
-            max="120"
-            value={age}
-            onChange={(event) => setAge(Number(event.target.value))}
-            required
-          />
-        </label>
+          <button
+            type="button"
+            className={`pressure-value ${activeField === 'diastolica' ? 'active' : ''}`}
+            onClick={() => handleFieldSelection('diastolica')}
+          >
+            <span>DIASTOLICA</span>
+            <strong>{diastolica}</strong>
+            <small>mmHg</small>
+          </button>
+        </div>
 
-        <label>
-          Sexo
-          <select value={gender} onChange={(event) => setGender(event.target.value)}>
-            <option>Masculino</option>
-            <option>Femenino</option>
-            <option>Otro</option>
-          </select>
-        </label>
-      </section>
-
-      <section className="form-card">
-        <h2>Factores de riesgo</h2>
-
-        <label className="switch-row">
-          <span>Hipertensión arterial</span>
-          <input
-            type="checkbox"
-            checked={hasHypertension}
-            onChange={(event) => setHasHypertension(event.target.checked)}
-          />
-        </label>
-
-        <label className="switch-row">
-          <span>Diabetes</span>
-          <input
-            type="checkbox"
-            checked={hasDiabetes}
-            onChange={(event) => setHasDiabetes(event.target.checked)}
-          />
-        </label>
-
-        <label className="switch-row">
-          <span>Tabaquismo</span>
-          <input
-            type="checkbox"
-            checked={smoker}
-            onChange={(event) => setSmoker(event.target.checked)}
-          />
-        </label>
-      </section>
-
-      <section className="form-card">
-        <h2>Síntomas actuales</h2>
-        <p className="muted">Selecciona todos los síntomas que presenta el paciente.</p>
-
-        <div className="symptoms-list">
-          {cardiovascularSymptoms.map((symptom) => (
-            <SymptomOption
-              key={symptom.id}
-              symptom={symptom}
-              selected={selectedSymptoms.includes(symptom.id)}
-              onToggle={() => toggleSymptom(symptom.id)}
-            />
-          ))}
+        <div className="pulse-row">
+          <p>
+            <Heart size={16} /> Pulso
+          </p>
+          <strong>
+            {pulse} <span>LPM</span>
+          </strong>
         </div>
       </section>
 
-      <button className="primary-button submit-button" disabled={loading}>
+      <section className="pressure-ok-box">
+        <CheckCircle2 size={18} />
+        <p>Estos valores se encuentran en el rango normal para su perfil.</p>
+      </section>
+
+      <section className="keypad-card">
+        <div className="keypad-grid">
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+            <button key={digit} type="button" className="keypad-key" onClick={() => handleDigit(digit)}>
+              {digit}
+            </button>
+          ))}
+          <button type="button" className="keypad-key keypad-key-muted" onClick={handleDelete}>
+            <Undo2 size={18} />
+          </button>
+          <button type="button" className="keypad-key" onClick={() => handleDigit('0')}>
+            0
+          </button>
+          <button
+            type="button"
+            className="keypad-key keypad-key-main"
+            onClick={handleNextField}
+          >
+            ↵
+          </button>
+        </div>
+      </section>
+
+      <button className="primary-button pressure-save-button" type="button" onClick={handleSaveMeasurement}>
         <Save size={18} />
-        {loading ? 'Analizando síntomas...' : 'Generar prediagnóstico'}
+        GUARDAR MEDICION
       </button>
-    </form>
+    </div>
   );
 };

@@ -5,6 +5,9 @@ import { Evaluation } from '../pages/Evaluation';
 import { Result } from '../pages/Result';
 import { History } from '../pages/History';
 import { Profile } from '../pages/Profile';
+import { Medication } from '../pages/Medication';
+import { EmergencyContact } from '../pages/EmergencyContact';
+import { Settings } from '../pages/Settings';
 
 export const router = createBrowserRouter([
   {
@@ -24,12 +27,24 @@ export const router = createBrowserRouter([
         element: <Result />,
       },
       {
+        path: 'medicacion',
+        element: <Medication />,
+      },
+      {
         path: 'historial',
         element: <History />,
       },
       {
         path: 'perfil',
         element: <Profile />,
+      },
+      {
+        path: 'contacto-emergencia',
+        element: <EmergencyContact />,
+      },
+      {
+        path: 'configuracion',
+        element: <Settings />,
       },
     ],
   },

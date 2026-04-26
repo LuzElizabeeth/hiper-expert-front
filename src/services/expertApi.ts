@@ -1,4 +1,11 @@
-import type { EvaluationPayload, EvaluationResult, Symptom } from '../types/expert.types';
+import type {
+  EmergencyContact,
+  EvaluationPayload,
+  EvaluationResult,
+  NotificationSettings,
+  PressureMeasurement,
+  Symptom,
+} from '../types/expert.types';
 export const cardiovascularSymptoms: Symptom[] = [
   {
     id: 'chest_pain',
@@ -123,4 +130,66 @@ export const getHistory = (): EvaluationResult[] => {
 export const getLastResult = (): EvaluationResult | null => {
   const history = getHistory();
   return history.length > 0 ? history[0] : null;
+};
+
+const PRESSURE_HISTORY_KEY = 'cardio-pressure-history';
+
+export const savePressureMeasurement = (measurement: Omit<PressureMeasurement, 'createdAt'>): void => {
+  const previous = localStorage.getItem(PRESSURE_HISTORY_KEY);
+  const history: PressureMeasurement[] = previous ? JSON.parse(previous) : [];
+
+  const newEntry: PressureMeasurement = {
+    ...measurement,
+    createdAt: new Date().toISOString(),
+  };
+
+  localStorage.setItem(PRESSURE_HISTORY_KEY, JSON.stringify([newEntry, ...history]));
+};
+
+export const getPressureHistory = (): PressureMeasurement[] => {
+  const data = localStorage.getItem(PRESSURE_HISTORY_KEY);
+  return data ? JSON.parse(data) : [];
+};
+
+const EMERGENCY_CONTACT_KEY = 'cardio-emergency-contact';
+
+export const saveEmergencyContact = (
+  contact: Omit<EmergencyContact, 'updatedAt'>
+): EmergencyContact => {
+  const payload: EmergencyContact = {
+    ...contact,
+    updatedAt: new Date().toISOString(),
+  };
+
+  localStorage.setItem(EMERGENCY_CONTACT_KEY, JSON.stringify(payload));
+  return payload;
+};
+
+export const getEmergencyContact = (): EmergencyContact | null => {
+  const data = localStorage.getItem(EMERGENCY_CONTACT_KEY);
+  return data ? JSON.parse(data) : null;
+};
+
+export const deleteEmergencyContact = (): void => {
+  localStorage.removeItem(EMERGENCY_CONTACT_KEY);
+};
+
+const NOTIFICATION_SETTINGS_KEY = 'cardio-notification-settings';
+
+export const defaultNotificationSettings: NotificationSettings = {
+  criticalAlerts: true,
+  aiTrends: true,
+  medicationReminders: true,
+  adherenceReminders: false,
+  dailyMeasurement: true,
+  healthTips: true,
+};
+
+export const getNotificationSettings = (): NotificationSettings => {
+  const data = localStorage.getItem(NOTIFICATION_SETTINGS_KEY);
+  return data ? JSON.parse(data) : defaultNotificationSettings;
+};
+
+export const saveNotificationSettings = (settings: NotificationSettings): void => {
+  localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(settings));
 };

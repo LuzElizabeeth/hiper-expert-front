@@ -1,86 +1,183 @@
 import { Link } from 'react-router-dom';
 import {
-  Activity,
-  AlertTriangle,
+  Bell,
+  PhoneCall,
+  CalendarDays,
+  Check,
+  CircleHelp,
   ClipboardPlus,
-  HeartPulse,
-  ShieldCheck,
+  Heart,
+  History,
+  PillBottle,
   Stethoscope,
 } from 'lucide-react';
-import { Header } from '../components/Header';
-import { HealthCard } from '../components/HealthCard';
-import { getHistory } from '../services/expertApi';
+import { getEmergencyContact, getNotificationSettings } from '../services/expertApi';
 
 export const Home = () => {
-  const history = getHistory();
-  const lastResult = history[0];
+  const emergencyContact = getEmergencyContact();
+  const settings = getNotificationSettings();
+  const cleanedPhone = emergencyContact?.phone.replace(/[^\d+]/g, '') ?? '';
+  const relationLabel =
+    emergencyContact?.relation === 'hijo'
+      ? 'Hijo'
+      : emergencyContact?.relation === 'hija'
+        ? 'Hija'
+        : emergencyContact?.relation === 'cuidador'
+          ? 'Cuidador'
+          : 'Contacto';
 
   return (
-    <div className="screen">
-      <Header title="Inicio" />
-
-      <section className="hero-card">
-        <div>
-          <p className="eyebrow">Sistema experto</p>
-          <h2>Detección temprana de riesgo cardiovascular</h2>
-          <p>
-            Registra síntomas y factores de riesgo para obtener una orientación preventiva.
-          </p>
+    <div className="screen home-dashboard">
+      <header className="home-topbar">
+        <div className="home-user">
+          <div className="home-avatar">N</div>
+          <strong>Nombre</strong>
         </div>
+        <button className="icon-button" type="button" aria-label="Notificaciones">
+          <Bell size={18} />
+        </button>
+      </header>
 
-        <HeartPulse size={54} />
+      <section className="home-greeting">
+        <h1>Buenos dias</h1>
+        <p>Jueves, 24 de Octubre</p>
       </section>
 
-      <div className="status-pill">
-        <ShieldCheck size={18} />
-        <span>Este sistema no sustituye una consulta médica profesional.</span>
+      <div className="home-week-pill">
+        <span className="home-dot" />
+        <span>Presion controlada esta semana</span>
       </div>
 
-      <HealthCard>
-        <div className="section-title-row">
-          <h2>Evaluación rápida</h2>
-          <Activity size={22} />
-        </div>
-
-        <p className="muted">
-          Contesta un formulario breve sobre síntomas relacionados con enfermedades cardiovasculares.
-        </p>
-
-        <Link to="/evaluacion" className="primary-button">
-          <ClipboardPlus size={18} />
-          Iniciar evaluación
-        </Link>
-      </HealthCard>
-
-      <HealthCard>
-        <div className="section-title-row">
-          <h2>Último resultado</h2>
-          <Stethoscope size={22} />
-        </div>
-
-        {lastResult ? (
-          <div className="last-result">
-            <span className={`risk-badge ${lastResult.riskLevel.toLowerCase()}`}>
-              Riesgo {lastResult.riskLevel}
-            </span>
-            <h3>{lastResult.score} puntos</h3>
-            <p>{lastResult.diagnosis}</p>
+      <section className="home-pressure-card">
+        <p className="home-card-subtitle">Ultima medicion hoy 08:30 AM</p>
+        <div className="pressure-gauge">
+          <div className="pressure-inner">
+            <h2>128/82</h2>
+            <span>mmHg</span>
           </div>
-        ) : (
-          <p className="muted">Todavía no hay evaluaciones registradas.</p>
-        )}
-      </HealthCard>
-
-      <HealthCard className="warning-card">
-        <AlertTriangle size={24} />
-        <div>
-          <h3>Importante</h3>
-          <p>
-            Si existe dolor fuerte en el pecho, falta de aire, sudoración fría o desmayo,
-            se debe buscar atención médica inmediata.
-          </p>
         </div>
-      </HealthCard>
+        <p className="heart-rate">
+          <Heart size={16} />
+          <strong>72</strong> lpm
+        </p>
+        <div className="home-status-box">Tu presion esta en rango saludable</div>
+      </section>
+
+      {settings.aiTrends ? (
+        <section className="home-ai-card">
+          <div className="home-ai-icon">
+            <Stethoscope size={16} />
+          </div>
+          <div>
+            <h3>Analisis de IA</h3>
+            <p>Posible perdida de adherencia nocturna. No registraste tu toma de Amlodipino ayer.</p>
+          </div>
+        </section>
+      ) : null}
+
+      {settings.medicationReminders ? (
+        <section className="home-med-card">
+          <h3>
+            <PillBottle size={18} />
+            Medicamentos de hoy
+          </h3>
+          <div className="med-item med-item-done">
+            <span className="med-check">
+              <Check size={14} />
+            </span>
+            <div>
+              <strong>Losartan</strong>
+              <p>8:00 AM • 50mg</p>
+            </div>
+            <span className="med-status">Tomado</span>
+          </div>
+          <div className="med-item">
+            <span className="med-check med-check-empty" />
+            <div>
+              <strong>Amlodipino</strong>
+              <p>8:00 PM • 5mg</p>
+            </div>
+          </div>
+          <button className="primary-button home-mark-button" type="button">
+            <Check size={18} />
+            Marcar como tomado
+          </button>
+        </section>
+      ) : null}
+
+      <section className="home-trend-card">
+        <h3>Tendencia semanal</h3>
+        <div className="home-chart">
+          {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((day, index) => (
+            <div key={`${day}-${index}`} className="bar-day">
+              <span className="bar-top" />
+              <span className="bar-bottom" />
+              <small>{day}</small>
+            </div>
+          ))}
+        </div>
+        <div className="home-chart-legend">
+          <span>
+            <i className="legend-dot legend-sys" />
+            Sistolica
+          </span>
+          <span>
+            <i className="legend-dot legend-dia" />
+            Diastolica
+          </span>
+        </div>
+      </section>
+
+      <section className="home-actions-grid">
+        <Link to="/evaluacion" className="action-card action-primary">
+          <ClipboardPlus size={22} />
+          {settings.dailyMeasurement ? 'Registrar presion' : 'Nueva medicion'}
+        </Link>
+        <Link to="/medicacion" className="action-card">
+          <Stethoscope size={22} />
+          Anadir medicacion
+        </Link>
+        <Link to="/historial" className="action-card">
+          <History size={22} />
+          Ver historial
+        </Link>
+        <Link to="/contacto-emergencia" className="action-card action-warning">
+          <CircleHelp size={22} />
+          Contactar cuidador
+        </Link>
+      </section>
+
+      {!settings.criticalAlerts && !settings.aiTrends && !settings.medicationReminders ? (
+        <section className="home-muted-info">
+          Varias alertas estan desactivadas. Puedes reactivarlas desde la seccion de configuracion.
+        </section>
+      ) : null}
+
+      {emergencyContact ? (
+        <section className="home-emergency-card">
+          <div>
+            <p>Contacto de emergencia</p>
+            <h3>{emergencyContact.fullName}</h3>
+            <small>{relationLabel}</small>
+          </div>
+          <div className="home-emergency-actions">
+            <a href={`tel:${cleanedPhone}`} className="home-call-btn">
+              <PhoneCall size={15} />
+              Llamar
+            </a>
+            <Link to="/contacto-emergencia" className="home-edit-contact-link">
+              Editar
+            </Link>
+          </div>
+        </section>
+      ) : null}
+
+      {settings.healthTips ? (
+        <section className="home-tip-card">
+          <CalendarDays size={18} />
+          <p>Reducir el sodio ayuda a controlar tu presion arterial de forma natural.</p>
+        </section>
+      ) : null}
     </div>
   );
 };

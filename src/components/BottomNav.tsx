@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, ClipboardPlus, History, Home, UserRound } from 'lucide-react';
+import { Bell, ClipboardPlus, History, Home, PillBottle } from 'lucide-react';
 
 const navItems = [
   {
@@ -8,14 +8,14 @@ const navItems = [
     icon: Home,
   },
   {
-    path: '/evaluacion',
-    label: 'Evaluar',
-    icon: ClipboardPlus,
+    path: '/configuracion',
+    label: 'Alertas',
+    icon: Bell,
   },
   {
-    path: '/resultado',
-    label: 'Resultado',
-    icon: Activity,
+    path: '/medicacion',
+    label: 'Medicación',
+    icon: PillBottle,
   },
   {
     path: '/historial',
@@ -24,8 +24,8 @@ const navItems = [
   },
   {
     path: '/perfil',
-    label: 'Perfil',
-    icon: UserRound,
+    label: 'Registro',
+    icon: ClipboardPlus,
   },
 ];
 
