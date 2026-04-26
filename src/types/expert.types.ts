@@ -41,6 +41,39 @@ export type EmergencyContact = {
   healthAlerts: boolean;
   shareData: boolean;
   hasPhoto: boolean;
+  /** Foto en base64 (data URL), elegida desde archivos del dispositivo */
+  photoDataUrl?: string | null;
+  updatedAt: string;
+};
+
+export type MedicationFrequency = 'diario' | 'interdiario';
+
+/** Medicación guardada desde la pantalla de añadir medicación */
+export type SavedMedication = {
+  id: string;
+  name: string;
+  doseMg: number;
+  frequency: MedicationFrequency;
+  intervalLabel: string;
+  firstDoseHHmm: string;
+  takeWithFood: boolean;
+  createdAt: string;
+};
+
+export type UserSex = 'masculino' | 'femenino' | 'otro' | 'prefiero_no_decir';
+
+export type UserProfile = {
+  displayName: string;
+  phone: string;
+  age: number | null;
+  sex: UserSex;
+  weightKg: number | null;
+  heightCm: number | null;
+  hasHypertension: boolean;
+  hasDiabetes: boolean;
+  smoker: boolean;
+  notes: string;
+  photoDataUrl: string | null;
   updatedAt: string;
 };
 

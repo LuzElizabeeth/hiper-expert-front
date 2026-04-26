@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CalendarClock, ClipboardCheck, PillBottle, Plus, Minus, Utensils } from 'lucide-react';
+import { saveMedicationEntry } from '../services/expertApi';
+import { formatTimeDisplayEs } from '../utils/timeDisplay';
 
 export const Medication = () => {
   const navigate = useNavigate();
@@ -8,8 +10,11 @@ export const Medication = () => {
   const [dose, setDose] = useState(50);
   const [frequency, setFrequency] = useState<'diario' | 'interdiario'>('diario');
   const [interval, setInterval] = useState('Cada 12 horas');
-  const [firstDoseTime, setFirstDoseTime] = useState('08:00 AM');
+  /** Hora primera toma en formato 24 h para el selector nativo */
+  const [firstDoseHHmm, setFirstDoseHHmm] = useState('08:00');
   const [takeWithFood, setTakeWithFood] = useState(true);
+  const [editingTime, setEditingTime] = useState(false);
+  const [draftTime, setDraftTime] = useState('08:00');
 
   const applySuggestedMedication = (name: string) => {
     setMedicineName(name);
@@ -23,11 +28,29 @@ export const Medication = () => {
     setDose((current) => Math.max(current - 5, 5));
   };
 
-  const toggleFirstDose = () => {
-    setFirstDoseTime((current) => (current === '08:00 AM' ? '08:00 PM' : '08:00 AM'));
+  const openTimeEditor = () => {
+    setDraftTime(firstDoseHHmm);
+    setEditingTime(true);
+  };
+
+  const saveTime = () => {
+    setFirstDoseHHmm(draftTime);
+    setEditingTime(false);
+  };
+
+  const cancelTimeEdit = () => {
+    setEditingTime(false);
   };
 
   const saveMedication = () => {
+    saveMedicationEntry({
+      name: medicineName.trim() || 'Medicamento',
+      doseMg: dose,
+      frequency,
+      intervalLabel: interval,
+      firstDoseHHmm,
+      takeWithFood,
+    });
     navigate('/');
   };
 
@@ -35,7 +58,7 @@ export const Medication = () => {
     <div className="screen medication-screen">
       <div className="page-topbar medication-topbar">
         <button type="button" onClick={() => navigate(-1)} className="icon-button">
-          <ArrowLeft size={20} />
+          <ArrowLeft size={22} />
         </button>
         <h1>Añadir medicación</h1>
       </div>
@@ -54,7 +77,7 @@ export const Medication = () => {
               onChange={(event) => setMedicineName(event.target.value)}
             />
             <button type="button" className="calendar-mini-btn" aria-label="Seleccionar medicación">
-              <CalendarClock size={15} />
+              <CalendarClock size={18} />
             </button>
           </div>
         </label>
@@ -80,14 +103,14 @@ export const Medication = () => {
           <span>DOSIS</span>
           <div className="dose-controls">
             <button type="button" onClick={decreaseDose} className="dose-btn" aria-label="Disminuir dosis">
-              <Minus size={20} />
+              <Minus size={22} />
             </button>
             <div className="dose-value">
               <strong>{dose}</strong>
               <small>MG</small>
             </div>
             <button type="button" onClick={increaseDose} className="dose-btn" aria-label="Aumentar dosis">
-              <Plus size={20} />
+              <Plus size={22} />
             </button>
           </div>
         </div>
@@ -122,23 +145,44 @@ export const Medication = () => {
 
         <section className="schedule-card">
           <h3>
-            <CalendarClock size={17} />
+            <CalendarClock size={20} />
             Configurar Horario
           </h3>
 
           <div className="first-dose-row">
             <div>
               <small>PRIMERA TOMA</small>
-              <strong>{firstDoseTime}</strong>
+              <strong className="first-dose-display">{formatTimeDisplayEs(firstDoseHHmm)}</strong>
             </div>
-            <button type="button" onClick={toggleFirstDose}>
+            <button type="button" className="first-dose-edit-btn" onClick={openTimeEditor}>
               EDITAR
             </button>
           </div>
 
+          {editingTime ? (
+            <div className="time-editor-panel" role="dialog" aria-label="Elegir hora de la primera toma">
+              <p className="time-editor-hint">Toque el reloj para elegir hora y minutos.</p>
+              <input
+                type="time"
+                className="time-input-elder"
+                value={draftTime}
+                onChange={(e) => setDraftTime(e.target.value)}
+                aria-label="Hora de la primera toma"
+              />
+              <div className="time-editor-actions">
+                <button type="button" className="secondary-button time-editor-cancel" onClick={cancelTimeEdit}>
+                  Cancelar
+                </button>
+                <button type="button" className="primary-button time-editor-save" onClick={saveTime}>
+                  Guardar hora
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <div className="food-row">
             <p>
-              <Utensils size={15} />
+              <Utensils size={18} />
               Tomar con comida
             </p>
             <button
@@ -153,16 +197,16 @@ export const Medication = () => {
         </section>
 
         <button type="button" className="primary-button medication-save-btn" onClick={saveMedication}>
-          <ClipboardCheck size={18} />
+          <ClipboardCheck size={20} />
           GUARDAR MEDICACIÓN
         </button>
       </section>
 
       <section className="medication-preview-card">
-        <PillBottle size={16} />
+        <PillBottle size={20} />
         <p>
-          {medicineName || 'Medicamento'} - {dose}mg - {frequency === 'diario' ? 'Diario' : 'Interdiario'} (
-          {interval})
+          {medicineName || 'Medicamento'} - {dose}mg - primera toma {formatTimeDisplayEs(firstDoseHHmm)} -{' '}
+          {frequency === 'diario' ? 'Diario' : 'Interdiario'} ({interval})
         </p>
       </section>
     </div>

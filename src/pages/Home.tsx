@@ -1,21 +1,46 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Bell,
   PhoneCall,
-  CalendarDays,
   Check,
   CircleHelp,
   ClipboardPlus,
   Heart,
   History,
   PillBottle,
+  Settings,
   Stethoscope,
 } from 'lucide-react';
-import { getEmergencyContact, getNotificationSettings } from '../services/expertApi';
+import { HomeHealthTips } from '../components/HomeHealthTips';
+import { getEmergencyContact, getNotificationSettings, getUserProfile } from '../services/expertApi';
+
+const profileInitial = (name: string) => {
+  const t = name.trim();
+  if (!t) return 'N';
+  return t[0].toUpperCase();
+};
+
+/** Saludo según la hora local (5–11 mañana, 12–19 tarde, resto noche). */
+const greetingForHour = (d: Date): string => {
+  const h = d.getHours();
+  if (h >= 5 && h < 12) return 'Buenos días';
+  if (h >= 12 && h < 20) return 'Buenas tardes';
+  return 'Buenas noches';
+};
 
 export const Home = () => {
+  const [now, setNow] = useState(() => new Date());
+  const userProfile = getUserProfile();
   const emergencyContact = getEmergencyContact();
   const settings = getNotificationSettings();
+
+  useEffect(() => {
+    const tick = () => setNow(new Date());
+    tick();
+    const id = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
   const cleanedPhone = emergencyContact?.phone.replace(/[^\d+]/g, '') ?? '';
   const relationLabel =
     emergencyContact?.relation === 'hijo'
@@ -30,17 +55,55 @@ export const Home = () => {
     <div className="screen home-dashboard">
       <header className="home-topbar">
         <div className="home-user">
-          <div className="home-avatar">N</div>
-          <strong>Nombre</strong>
+          {userProfile.photoDataUrl ? (
+            <div className="home-avatar home-avatar--photo">
+              <img src={userProfile.photoDataUrl} alt="" />
+            </div>
+          ) : (
+            <div className="home-avatar" aria-hidden>
+              {profileInitial(userProfile.displayName)}
+            </div>
+          )}
+          <strong>{userProfile.displayName.trim() || 'Nombre'}</strong>
         </div>
-        <button className="icon-button" type="button" aria-label="Notificaciones">
-          <Bell size={18} />
-        </button>
+        <div className="home-topbar-actions">
+          <Link
+            to="/configuracion/notificaciones"
+            className="icon-button topbar-action-btn"
+            aria-label="Notificaciones"
+          >
+            <Bell size={26} strokeWidth={2} />
+          </Link>
+          <Link to="/configuracion" className="icon-button topbar-action-btn" aria-label="Configuración">
+            <Settings size={26} strokeWidth={2} />
+          </Link>
+        </div>
       </header>
 
       <section className="home-greeting">
-        <h1>Buenos días</h1>
-        <p>Seguimiento de hipertensión</p>
+        <time className="home-greeting-datetime" dateTime={now.toISOString()}>
+          <span className="home-greeting-date">
+            {now
+              .toLocaleDateString('es-MX', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })
+              .replace(/^\w/, (c) => c.toUpperCase())}
+          </span>
+          <span className="home-greeting-time">
+            {now.toLocaleTimeString('es-MX', {
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true,
+            })}
+          </span>
+        </time>
+        <div className="home-greeting-message">
+          <h1>{greetingForHour(now)}</h1>
+          <p>Seguimiento de hipertensión</p>
+        </div>
       </section>
 
       <div className="home-week-pill">
@@ -65,8 +128,8 @@ export const Home = () => {
 
       {settings.aiTrends ? (
         <section className="home-ai-card">
-          <div className="home-ai-icon">
-            <Stethoscope size={16} />
+          <div className="home-card-header-icon">
+            <Stethoscope size={28} strokeWidth={2} />
           </div>
           <div>
             <h3>Análisis de hipertensión</h3>
@@ -78,7 +141,9 @@ export const Home = () => {
       {settings.medicationReminders ? (
         <section className="home-med-card">
           <h3>
-            <PillBottle size={18} />
+            <span className="home-card-header-icon">
+              <PillBottle size={28} strokeWidth={2} />
+            </span>
             Medicamentos de hoy
           </h3>
           <div className="med-item med-item-done">
@@ -119,7 +184,7 @@ export const Home = () => {
         <div className="home-chart-legend">
           <span>
             <i className="legend-dot legend-sys" />
-            Sistolica
+            Sistólica
           </span>
           <span>
             <i className="legend-dot legend-dia" />
@@ -131,7 +196,7 @@ export const Home = () => {
       <section className="home-actions-grid">
         <Link to="/evaluacion" className="action-card action-primary">
           <ClipboardPlus size={22} />
-          {settings.dailyMeasurement ? 'Registrar presiónpresión' : 'Nueva medición'}
+          {settings.dailyMeasurement ? 'Registrar presión' : 'Nueva medición'}
         </Link>
         <Link to="/medicacion" className="action-card">
           <Stethoscope size={22} />
@@ -172,12 +237,7 @@ export const Home = () => {
         </section>
       ) : null}
 
-      {settings.healthTips ? (
-        <section className="home-tip-card">
-          <CalendarDays size={18} />
-          <p>Reducir el sodio ayuda a controlar tu presión arterial de forma natural.</p>
-        </section>
-      ) : null}
+      {settings.healthTips ? <HomeHealthTips /> : null}
     </div>
   );
 };

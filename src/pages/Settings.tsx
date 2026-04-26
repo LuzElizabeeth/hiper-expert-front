@@ -70,8 +70,8 @@ export const Settings = () => {
   return (
     <div className="screen settings-screen">
       <div className="page-topbar settings-topbar">
-        <button type="button" onClick={() => navigate(-1)} className="icon-button">
-          <ArrowLeft size={20} />
+        <button type="button" onClick={() => navigate('/configuracion')} className="icon-button">
+          <ArrowLeft size={22} />
         </button>
         <h1>Notificaciones</h1>
       </div>
@@ -144,7 +144,7 @@ export const Settings = () => {
         />
         <SettingRow
           title="Consejos de Salud"
-          description="Tips semanales y recomendaciones"
+          description="Consejos sobre hipertensión al final de Inicio; cambian cada 30 segundos"
           checked={settings.healthTips}
           onToggle={() => toggle('healthTips')}
         />

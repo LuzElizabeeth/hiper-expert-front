@@ -1,7 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Camera, ShieldCheck, Trash2, UserRound, Users, User } from 'lucide-react';
-import { deleteEmergencyContact, getEmergencyContact, saveEmergencyContact } from '../services/expertApi';
+import {
+  deleteEmergencyContact,
+  getEmergencyContact,
+  readImageFileAsDataUrl,
+  saveEmergencyContact,
+} from '../services/expertApi';
 import type { EmergencyRelation } from '../types/expert.types';
 
 const relationOptions: Array<{ id: EmergencyRelation; label: string; icon: 'users' | 'user' }> = [
@@ -13,6 +18,7 @@ const relationOptions: Array<{ id: EmergencyRelation; label: string; icon: 'user
 
 export const EmergencyContact = () => {
   const navigate = useNavigate();
+  const fileRef = useRef<HTMLInputElement>(null);
   const existing = getEmergencyContact();
   const isEditing = Boolean(existing);
 
@@ -21,8 +27,9 @@ export const EmergencyContact = () => {
   const [phone, setPhone] = useState(existing?.phone ?? '+1 (555) 000-0000');
   const [healthAlerts, setHealthAlerts] = useState(existing?.healthAlerts ?? true);
   const [shareData, setShareData] = useState(existing?.shareData ?? true);
-  const [hasPhoto, setHasPhoto] = useState(existing?.hasPhoto ?? false);
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(existing?.photoDataUrl ?? null);
   const [savedMessage, setSavedMessage] = useState('');
+  const [fileError, setFileError] = useState('');
 
   const relationText = useMemo(() => {
     if (relation === 'hijo') return 'Hijo';
@@ -31,6 +38,19 @@ export const EmergencyContact = () => {
     return 'Contacto de confianza';
   }, [relation]);
 
+  const handlePhotoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setFileError('');
+    try {
+      const url = await readImageFileAsDataUrl(file);
+      setPhotoDataUrl(url);
+    } catch (e) {
+      setFileError(e instanceof Error ? e.message : 'No se pudo cargar la imagen.');
+    }
+  };
+
   const handleSave = () => {
     saveEmergencyContact({
       fullName,
@@ -38,7 +58,8 @@ export const EmergencyContact = () => {
       phone,
       healthAlerts,
       shareData,
-      hasPhoto,
+      hasPhoto: Boolean(photoDataUrl),
+      photoDataUrl,
     });
     setSavedMessage(isEditing ? 'Cambios guardados' : 'Contacto guardado');
   };
@@ -50,12 +71,22 @@ export const EmergencyContact = () => {
     setPhone('+1 (555) 000-0000');
     setHealthAlerts(true);
     setShareData(true);
-    setHasPhoto(false);
+    setPhotoDataUrl(null);
     setSavedMessage('Contacto eliminado');
   };
 
+  const openFilePicker = () => fileRef.current?.click();
+
   return (
     <div className="screen emergency-screen">
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="profile-file-input"
+        onChange={handlePhotoChange}
+      />
+
       <div className="page-topbar emergency-topbar">
         <button type="button" onClick={() => navigate(-1)} className="icon-button">
           <ArrowLeft size={20} />
@@ -66,8 +97,12 @@ export const EmergencyContact = () => {
       {isEditing ? (
         <section className="contact-summary-card">
           <div className="contact-avatar">
-            <UserRound size={34} />
-            <button type="button" onClick={() => setHasPhoto((current) => !current)}>
+            {photoDataUrl ? (
+              <img src={photoDataUrl} alt="" className="contact-avatar-img" />
+            ) : (
+              <UserRound size={34} />
+            )}
+            <button type="button" onClick={openFilePicker} aria-label="Cambiar foto del contacto">
               <Camera size={13} />
             </button>
           </div>
@@ -75,6 +110,17 @@ export const EmergencyContact = () => {
           <p>
             {relationText} {fullName ? '• Contacto de confianza' : ''}
           </p>
+          <div className="contact-photo-actions">
+            <button type="button" className="secondary-link-btn" onClick={openFilePicker}>
+              Elegir foto desde archivos
+            </button>
+            {photoDataUrl ? (
+              <button type="button" className="secondary-link-btn muted" onClick={() => setPhotoDataUrl(null)}>
+                Quitar foto
+              </button>
+            ) : null}
+          </div>
+          {fileError ? <p className="profile-file-error">{fileError}</p> : null}
         </section>
       ) : null}
 
@@ -121,13 +167,29 @@ export const EmergencyContact = () => {
         </label>
 
         {!isEditing ? (
-          <button type="button" className="photo-card" onClick={() => setHasPhoto((current) => !current)}>
-            <div className="photo-avatar">{hasPhoto ? <UserRound size={22} /> : <Camera size={18} />}</div>
+          <button type="button" className="photo-card" onClick={openFilePicker}>
+            <div className="photo-avatar">
+              {photoDataUrl ? (
+                <img src={photoDataUrl} alt="" className="photo-avatar-img" />
+              ) : (
+                <Camera size={18} />
+              )}
+            </div>
             <div>
-              <strong>Añade una foto</strong>
-              <p>Ayuda a identificar contactos rápidamente durante emergencias.</p>
+              <strong>{photoDataUrl ? 'Cambiar foto' : 'Añade una foto'}</strong>
+              <p>Ayuda a identificar al contacto rápidamente durante emergencias.</p>
             </div>
           </button>
+        ) : null}
+
+        {!isEditing && fileError ? <p className="profile-file-error">{fileError}</p> : null}
+
+        {!isEditing && photoDataUrl ? (
+          <div className="contact-photo-actions new-contact-photo-actions">
+            <button type="button" className="secondary-link-btn muted" onClick={() => setPhotoDataUrl(null)}>
+              Quitar foto
+            </button>
+          </div>
         ) : null}
 
         <section className="alerts-card">

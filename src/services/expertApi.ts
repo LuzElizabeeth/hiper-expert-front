@@ -4,7 +4,9 @@ import type {
   EvaluationResult,
   NotificationSettings,
   PressureMeasurement,
+  SavedMedication,
   Symptom,
+  UserProfile,
 } from '../types/expert.types';
 
 export const hypertensionSymptoms: Symptom[] = [
@@ -159,6 +161,8 @@ export const saveEmergencyContact = (
 ): EmergencyContact => {
   const payload: EmergencyContact = {
     ...contact,
+    hasPhoto: Boolean(contact.photoDataUrl),
+    photoDataUrl: contact.photoDataUrl ?? null,
     updatedAt: new Date().toISOString(),
   };
 
@@ -193,4 +197,97 @@ export const getNotificationSettings = (): NotificationSettings => {
 
 export const saveNotificationSettings = (settings: NotificationSettings): void => {
   localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(settings));
+};
+
+const USER_PROFILE_KEY = 'cardio-user-profile';
+const MAX_IMAGE_BYTES = 1_800_000;
+
+export const emptyUserProfile: Omit<UserProfile, 'updatedAt'> = {
+  displayName: '',
+  phone: '',
+  age: null,
+  sex: 'prefiero_no_decir',
+  weightKg: null,
+  heightCm: null,
+  hasHypertension: false,
+  hasDiabetes: false,
+  smoker: false,
+  notes: '',
+  photoDataUrl: null,
+};
+
+export const readImageFileAsDataUrl = (file: File): Promise<string> => {
+  if (!file.type.startsWith('image/')) {
+    return Promise.reject(new Error('Seleccione un archivo de imagen.'));
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    return Promise.reject(
+      new Error('La imagen es demasiado grande. Pruebe con una de menos de 1,5 MB.')
+    );
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error('No se pudo leer el archivo.'));
+    reader.readAsDataURL(file);
+  });
+};
+
+export const getUserProfile = (): UserProfile => {
+  const data = localStorage.getItem(USER_PROFILE_KEY);
+  const base = { ...emptyUserProfile, updatedAt: '' };
+  if (!data) {
+    return { ...base, updatedAt: '' };
+  }
+  try {
+    const parsed = JSON.parse(data) as Partial<UserProfile>;
+    return {
+      ...emptyUserProfile,
+      ...parsed,
+      updatedAt: parsed.updatedAt ?? '',
+    };
+  } catch {
+    return { ...base, updatedAt: '' };
+  }
+};
+
+export const saveUserProfile = (profile: Omit<UserProfile, 'updatedAt'>): UserProfile => {
+  const payload: UserProfile = {
+    ...profile,
+    photoDataUrl: profile.photoDataUrl ?? null,
+    updatedAt: new Date().toISOString(),
+  };
+  localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(payload));
+  return payload;
+};
+
+const MEDICATIONS_KEY = 'cardio-saved-medications';
+
+export const getMedications = (): SavedMedication[] => {
+  const data = localStorage.getItem(MEDICATIONS_KEY);
+  if (!data) return [];
+  try {
+    const parsed = JSON.parse(data) as SavedMedication[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const newMedicationId = (): string =>
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `med-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+export const saveMedicationEntry = (
+  entry: Omit<SavedMedication, 'id' | 'createdAt'>
+): SavedMedication => {
+  const list = getMedications();
+  const newItem: SavedMedication = {
+    ...entry,
+    id: newMedicationId(),
+    createdAt: new Date().toISOString(),
+  };
+  localStorage.setItem(MEDICATIONS_KEY, JSON.stringify([newItem, ...list]));
+  return newItem;
 };

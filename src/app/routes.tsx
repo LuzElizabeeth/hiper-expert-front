@@ -8,6 +8,9 @@ import { Profile } from '../pages/Profile';
 import { Medication } from '../pages/Medication';
 import { EmergencyContact } from '../pages/EmergencyContact';
 import { Settings } from '../pages/Settings';
+import { Configuration } from '../pages/Configuration';
+import { ConfigurationProfile } from '../pages/ConfigurationProfile';
+import { Alerts } from '../pages/Alerts';
 
 export const router = createBrowserRouter([
   {
@@ -21,6 +24,10 @@ export const router = createBrowserRouter([
       {
         path: 'evaluacion',
         element: <Evaluation />,
+      },
+      {
+        path: 'alertas',
+        element: <Alerts />,
       },
       {
         path: 'resultado',
@@ -44,7 +51,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'configuracion',
+        element: <Configuration />,
+      },
+      {
+        path: 'configuracion/notificaciones',
         element: <Settings />,
+      },
+      {
+        path: 'configuracion/perfil',
+        element: <ConfigurationProfile />,
       },
     ],
   },

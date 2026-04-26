@@ -5,16 +5,16 @@ import { savePressureMeasurement } from '../services/expertApi';
 
 export const Evaluation = () => {
   const navigate = useNavigate();
-  const [activeField, setActiveField] = useState<'sistolica' | 'DIASTÓLICA'>('sistolica');
+  const [activeField, setActiveField] = useState<'sistolica' | 'diastolica'>('sistolica');
   const [sistolica, setSistolica] = useState('120');
-  const [DIASTÓLICA, setDIASTÓLICA] = useState('80');
+  const [diastolica, setDiastolica] = useState('80');
   const [replaceOnNextTap, setReplaceOnNextTap] = useState(true);
 
   const pulse = 72;
 
   const activeValue = useMemo(
-    () => (activeField === 'sistolica' ? SISTÓLICA: DIASTÓLICA),
-    [activeField, sistolica, DIASTÓLICA]
+    () => (activeField === 'sistolica' ? sistolica : diastolica),
+    [activeField, sistolica, diastolica]
   );
 
   const updateActiveField = (nextValue: string) => {
@@ -22,7 +22,7 @@ export const Evaluation = () => {
       setSistolica(nextValue);
       return;
     }
-    setDIASTÓLICA(nextValue);
+    setDiastolica(nextValue);
   };
 
   const handleDigit = (digit: string) => {
@@ -46,20 +46,32 @@ export const Evaluation = () => {
     setReplaceOnNextTap(false);
   };
 
-  const handleFieldSelection = (field: 'sistolica' | 'DIASTÓLICA') => {
+  const handleFieldSelection = (field: 'sistolica' | 'diastolica') => {
     setActiveField(field);
     setReplaceOnNextTap(true);
   };
 
   const handleNextField = () => {
-    setActiveField((current) => (current === 'sistolica' ? 'DIASTÓLICA' : 'sistolica'));
+    setActiveField((current) => (current === 'sistolica' ? 'diastolica' : 'sistolica'));
     setReplaceOnNextTap(true);
   };
 
+  const sysNum = Number(sistolica);
+  const diaNum = Number(diastolica);
+  const canSave =
+    Number.isFinite(sysNum) &&
+    Number.isFinite(diaNum) &&
+    sysNum >= 40 &&
+    diaNum >= 30 &&
+    sysNum <= 300 &&
+    diaNum <= 200;
+
   const handleSaveMeasurement = () => {
+    if (!canSave) return;
+
     savePressureMeasurement({
-      systolic: Number(sistolica),
-      diastolic: Number(DIASTÓLICA),
+      systolic: sysNum,
+      diastolic: diaNum,
       pulse,
     });
 
@@ -68,11 +80,12 @@ export const Evaluation = () => {
 
   return (
     <div className="screen pressure-register-screen">
-      <div className="page-topbar">
-        <button type="button" onClick={() => navigate(-1)} className="icon-button">
+      <div className="page-topbar pressure-register-topbar">
+        <button type="button" onClick={() => navigate(-1)} className="icon-button" aria-label="Volver">
           <ArrowLeft size={20} />
         </button>
-        <h1>Registrar presiónpresión</h1>
+        <h1>Registrar presión</h1>
+        <span className="pressure-topbar-spacer" aria-hidden="true" />
       </div>
 
       <section className="pressure-panel">
@@ -82,18 +95,18 @@ export const Evaluation = () => {
             className={`pressure-value ${activeField === 'sistolica' ? 'active' : ''}`}
             onClick={() => handleFieldSelection('sistolica')}
           >
-            <span>SISTOLICA</span>
+            <span>SISTÓLICA</span>
             <strong>{sistolica}</strong>
             <small>mmHg</small>
           </button>
 
           <button
             type="button"
-            className={`pressure-value ${activeField === 'DIASTÓLICA' ? 'active' : ''}`}
-            onClick={() => handleFieldSelection('DIASTÓLICA')}
+            className={`pressure-value ${activeField === 'diastolica' ? 'active' : ''}`}
+            onClick={() => handleFieldSelection('diastolica')}
           >
             <span>DIASTÓLICA</span>
-            <strong>{DIASTÓLICA}</strong>
+            <strong>{diastolica}</strong>
             <small>mmHg</small>
           </button>
         </div>
@@ -126,19 +139,20 @@ export const Evaluation = () => {
           <button type="button" className="keypad-key" onClick={() => handleDigit('0')}>
             0
           </button>
-          <button
-            type="button"
-            className="keypad-key keypad-key-main"
-            onClick={handleNextField}
-          >
+          <button type="button" className="keypad-key keypad-key-main" onClick={handleNextField}>
             ↵
           </button>
         </div>
       </section>
 
-      <button className="primary-button pressure-save-button" type="button" onClick={handleSaveMeasurement}>
+      <button
+        className="primary-button pressure-save-button"
+        type="button"
+        onClick={handleSaveMeasurement}
+        disabled={!canSave}
+      >
         <Save size={18} />
-        GUARDAR MEDICION
+        GUARDAR MEDICIÓN
       </button>
     </div>
   );

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Bell, ClipboardPlus, History, Home, PillBottle } from 'lucide-react';
+import { Bell, ClipboardPlus, HeartPulse, History, Home, PillBottle } from 'lucide-react';
 
 const navItems = [
   {
@@ -8,7 +8,12 @@ const navItems = [
     icon: Home,
   },
   {
-    path: '/configuracion',
+    path: '/evaluacion',
+    label: 'Presión',
+    icon: HeartPulse,
+  },
+  {
+    path: '/alertas',
     label: 'Alertas',
     icon: Bell,
   },
@@ -40,7 +45,7 @@ export const BottomNav = () => {
 
         return (
           <Link key={item.path} to={item.path} className={`nav-item ${active ? 'active' : ''}`}>
-            <Icon size={18} />
+            <Icon className="nav-item-icon" size={26} strokeWidth={2} />
             <span>{item.label}</span>
           </Link>
         );
