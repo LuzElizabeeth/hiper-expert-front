@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Bell, ClipboardPlus, HeartPulse, History, Home, PillBottle } from 'lucide-react';
+import { Bell, ClipboardPlus, HeartPulse,  Home, PillBottle } from 'lucide-react';
 
 const navItems = [
   {
