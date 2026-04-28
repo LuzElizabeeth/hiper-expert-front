@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Bell,
   ChartNoAxesCombined,
@@ -8,8 +8,11 @@ import {
   Heart,
   Settings,
 } from 'lucide-react';
-import { getPressureHistory, getUserProfile } from '../services/expertApi';
-import type { MeasurementRange, PressureMeasurement } from '../types/expert.types';
+import { getCurrentUser } from '../api/home.api';
+import { getVitals, type VitalRecord } from '../api/vitals.api';
+
+type MeasurementRange = 'semana' | 'mes' | 'anio';
+type ChartPoint = { sys: number; dia: number; t: number };
 
 const profileInitial = (name: string) => {
   const t = name.trim();
@@ -17,43 +20,55 @@ const profileInitial = (name: string) => {
   return t[0].toUpperCase();
 };
 
-type ChartPoint = { sys: number; dia: number; t: number };
+function recordDate(item: VitalRecord) {
+  return item.recorded_at || item.created_at;
+}
 
-function avgReadings(readings: PressureMeasurement[]): { sys: number; dia: number } {
+function avgReadings(readings: VitalRecord[]): { sys: number; dia: number } {
   if (readings.length === 0) return { sys: 0, dia: 0 };
-  const s = readings.reduce((a, r) => a + r.systolic, 0);
-  const d = readings.reduce((a, r) => a + r.diastolic, 0);
+
+  const s = readings.reduce((a, r) => a + r.systolic_bp, 0);
+  const d = readings.reduce((a, r) => a + r.diastolic_bp, 0);
+
   return {
     sys: Math.round(s / readings.length),
     dia: Math.round(d / readings.length),
   };
 }
 
-/** Puntos para el gráfico según rango: semana = cada medición; mes = promedio por día; año = promedio por mes */
-function buildChartSeries(readings: PressureMeasurement[], range: MeasurementRange): ChartPoint[] {
+function buildChartSeries(
+  readings: VitalRecord[],
+  range: MeasurementRange
+): ChartPoint[] {
   const sorted = [...readings].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    (a, b) =>
+      new Date(recordDate(a)).getTime() - new Date(recordDate(b)).getTime()
   );
+
   if (sorted.length === 0) return [];
 
   if (range === 'semana') {
     return sorted.map((r) => ({
-      sys: r.systolic,
-      dia: r.diastolic,
-      t: new Date(r.createdAt).getTime(),
+      sys: r.systolic_bp,
+      dia: r.diastolic_bp,
+      t: new Date(recordDate(r)).getTime(),
     }));
   }
 
   if (range === 'mes') {
-    const byDay = new Map<number, PressureMeasurement[]>();
+    const byDay = new Map<number, VitalRecord[]>();
+
     for (const r of sorted) {
-      const d = new Date(r.createdAt);
+      const d = new Date(recordDate(r));
       d.setHours(0, 0, 0, 0);
+
       const k = d.getTime();
       const arr = byDay.get(k) ?? [];
+
       arr.push(r);
       byDay.set(k, arr);
     }
+
     return Array.from(byDay.entries())
       .sort(([a], [b]) => a - b)
       .map(([t, arr]) => {
@@ -62,19 +77,26 @@ function buildChartSeries(readings: PressureMeasurement[], range: MeasurementRan
       });
   }
 
-  const byMonth = new Map<string, PressureMeasurement[]>();
+  const byMonth = new Map<string, VitalRecord[]>();
+
   for (const r of sorted) {
-    const d = new Date(r.createdAt);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const d = new Date(recordDate(r));
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+      2,
+      '0'
+    )}`;
+
     const arr = byMonth.get(key) ?? [];
     arr.push(r);
     byMonth.set(key, arr);
   }
+
   return Array.from(byMonth.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, arr]) => {
       const [y, m] = key.split('-').map(Number);
       const { sys, dia } = avgReadings(arr);
+
       return { sys, dia, t: new Date(y, m - 1, 1).getTime() };
     });
 }
@@ -85,25 +107,32 @@ function averageLabel(range: MeasurementRange): string {
   return 'ANUAL';
 }
 
-function bpStatus(sys: number, dia: number): { label: string; variant: 'normal' | 'attention' | 'high' } {
-  if (sys >= 180 || dia >= 120) return { label: 'CRÍTICO', variant: 'high' };
+function bpStatus(
+  sys: number,
+  dia: number
+): { label: string; variant: 'normal' | 'attention' | 'high' } {
+  if (sys >= 180 || dia >= 110) return { label: 'CRÍTICO', variant: 'high' };
   if (sys >= 140 || dia >= 90) return { label: 'ALTO', variant: 'high' };
-  if (sys >= 130 || dia >= 80) return { label: 'ATENCIÓN', variant: 'attention' };
+  if (sys >= 130 || dia >= 85) return { label: 'ATENCIÓN', variant: 'attention' };
   return { label: 'NORMAL', variant: 'normal' };
 }
 
 function rowBarClass(sys: number, dia: number): string {
   const st = bpStatus(sys, dia);
+
   if (st.variant === 'high') return 'measurement-bar--high';
   if (st.variant === 'attention') return 'measurement-bar--mid';
+
   return 'measurement-bar--ok';
 }
 
 function formatGroupHeading(date: Date): string {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
+
   const y = new Date(start);
   y.setDate(y.getDate() - 1);
+
   const d0 = new Date(date);
   d0.setHours(0, 0, 0, 0);
 
@@ -113,36 +142,71 @@ function formatGroupHeading(date: Date): string {
 
   if (d0.getTime() === start.getTime()) return `HOY, ${rest}`;
   if (d0.getTime() === y.getTime()) return `AYER, ${rest}`;
-  return `${date.toLocaleDateString('es-MX', { weekday: 'long' }).toUpperCase()}, ${rest}`;
+
+  return `${date
+    .toLocaleDateString('es-MX', { weekday: 'long' })
+    .toUpperCase()}, ${rest}`;
 }
 
 export const History = () => {
-  const location = useLocation();
   const [range, setRange] = useState<MeasurementRange>('semana');
-  const userProfile = getUserProfile();
 
-  const history = useMemo(() => getPressureHistory(), [location.pathname]);
+  const [user, setUser] = useState<any>(null);
+  const [history, setHistory] = useState<VitalRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function loadHistory() {
+      try {
+        setLoading(true);
+        setError('');
+
+        const [userRes, vitalsRes] = await Promise.all([
+          getCurrentUser(),
+          getVitals(100),
+        ]);
+
+        setUser(userRes.data);
+        setHistory(vitalsRes.data ?? []);
+      } catch (err: any) {
+        setError(
+          err.response?.data?.error?.message ||
+            'No se pudo cargar el historial.'
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadHistory();
+  }, []);
+
+  const displayName = user?.full_name ?? 'Nombre';
 
   const filtered = useMemo(() => {
     const now = new Date();
     const days = range === 'semana' ? 7 : range === 'mes' ? 30 : 365;
+
     const start = new Date(now);
     start.setDate(start.getDate() - days);
     start.setHours(0, 0, 0, 0);
 
-    return history.filter((item) => new Date(item.createdAt) >= start);
+    return history.filter((item) => new Date(recordDate(item)) >= start);
   }, [history, range]);
 
   const average = useMemo(() => {
     if (filtered.length === 0) return { systolic: 0, diastolic: 0 };
+
     const totals = filtered.reduce(
       (acc, item) => {
-        acc.systolic += item.systolic;
-        acc.diastolic += item.diastolic;
+        acc.systolic += item.systolic_bp;
+        acc.diastolic += item.diastolic_bp;
         return acc;
       },
       { systolic: 0, diastolic: 0 }
     );
+
     return {
       systolic: Math.round(totals.systolic / filtered.length),
       diastolic: Math.round(totals.diastolic / filtered.length),
@@ -154,7 +218,10 @@ export const History = () => {
     [average.systolic, average.diastolic]
   );
 
-  const chartSeries = useMemo(() => buildChartSeries(filtered, range), [filtered, range]);
+  const chartSeries = useMemo(
+    () => buildChartSeries(filtered, range),
+    [filtered, range]
+  );
 
   const chartSvg = useMemo(() => {
     if (chartSeries.length === 0) return null;
@@ -168,6 +235,7 @@ export const History = () => {
     const allVals = chartSeries.flatMap((p) => [p.sys, p.dia]);
     let minBp = Math.min(...allVals) - 8;
     let maxBp = Math.max(...allVals) + 8;
+
     if (maxBp - minBp < 20) {
       const mid = (maxBp + minBp) / 2;
       minBp = mid - 12;
@@ -175,20 +243,44 @@ export const History = () => {
     }
 
     const n = chartSeries.length;
-    const toX = (i: number) => pad.l + innerW * (n === 1 ? 0.5 : i / (n - 1));
-    const toY = (v: number) => pad.t + innerH * (1 - (v - minBp) / (maxBp - minBp));
+    const toX = (i: number) =>
+      pad.l + innerW * (n === 1 ? 0.5 : i / (n - 1));
 
-    const sysPts = chartSeries.map((p, i) => ({ x: toX(i), y: toY(p.sys), ...p }));
-    const diaPts = chartSeries.map((p, i) => ({ x: toX(i), y: toY(p.dia) }));
+    const toY = (v: number) =>
+      pad.t + innerH * (1 - (v - minBp) / (maxBp - minBp));
 
-    const lineSys = sysPts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-    const lineDia = diaPts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const sysPts = chartSeries.map((p, i) => ({
+      x: toX(i),
+      y: toY(p.sys),
+      ...p,
+    }));
+
+    const diaPts = chartSeries.map((p, i) => ({
+      x: toX(i),
+      y: toY(p.dia),
+    }));
+
+    const lineSys = sysPts
+      .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+      .join(' ');
+
+    const lineDia = diaPts
+      .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+      .join(' ');
 
     let areaD: string;
+
     if (n === 1) {
       const x = sysPts[0].x;
       const w = 8;
-      areaD = `M ${(x - w).toFixed(1)} ${sysPts[0].y.toFixed(1)} L ${(x + w).toFixed(1)} ${sysPts[0].y.toFixed(1)} L ${(x + w).toFixed(1)} ${diaPts[0].y.toFixed(1)} L ${(x - w).toFixed(1)} ${diaPts[0].y.toFixed(1)} Z`;
+
+      areaD = `M ${(x - w).toFixed(1)} ${sysPts[0].y.toFixed(1)} L ${(
+        x + w
+      ).toFixed(1)} ${sysPts[0].y.toFixed(1)} L ${(x + w).toFixed(
+        1
+      )} ${diaPts[0].y.toFixed(1)} L ${(x - w).toFixed(1)} ${diaPts[0].y.toFixed(
+        1
+      )} Z`;
     } else {
       areaD =
         `M ${sysPts[0].x.toFixed(1)} ${sysPts[0].y.toFixed(1)}` +
@@ -212,20 +304,17 @@ export const History = () => {
       lineDia,
       sysPts,
       diaPts,
-      minBp,
-      maxBp,
-      pad,
-      innerH,
-      toY,
     };
   }, [chartSeries]);
 
   const groupedByDate = useMemo(() => {
-    const groups = filtered.reduce<Record<string, PressureMeasurement[]>>((acc, entry) => {
-      const d = new Date(entry.createdAt);
+    const groups = filtered.reduce<Record<string, VitalRecord[]>>((acc, entry) => {
+      const d = new Date(recordDate(entry));
       d.setHours(0, 0, 0, 0);
+
       const key = d.getTime().toString();
       acc[key] = acc[key] ? [...acc[key], entry] : [entry];
+
       return acc;
     }, {});
 
@@ -235,7 +324,9 @@ export const History = () => {
         timeKey,
         heading: formatGroupHeading(new Date(Number(timeKey))),
         records: [...records].sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          (a, b) =>
+            new Date(recordDate(b)).getTime() -
+            new Date(recordDate(a)).getTime()
         ),
       }));
   }, [filtered]);
@@ -244,26 +335,27 @@ export const History = () => {
     <div className="screen measures-history-screen history-screen-v2">
       <header className="home-topbar">
         <div className="home-user">
-          {userProfile.photoDataUrl ? (
-            <div className="home-avatar home-avatar--photo">
-              <img src={userProfile.photoDataUrl} alt="" />
-            </div>
-          ) : (
-            <div className="home-avatar" aria-hidden>
-              {profileInitial(userProfile.displayName)}
-            </div>
-          )}
-          <strong>{userProfile.displayName.trim() || 'Nombre'}</strong>
+          <div className="home-avatar" aria-hidden>
+            {profileInitial(displayName)}
+          </div>
+
+          <strong>{displayName.trim() || 'Nombre'}</strong>
         </div>
+
         <div className="home-topbar-actions">
           <Link
-            to="/configuracion/notificaciones"
+            to="/alertas"
             className="icon-button topbar-action-btn"
-            aria-label="Notificaciones"
+            aria-label="Alertas"
           >
             <Bell size={26} strokeWidth={2} />
           </Link>
-          <Link to="/configuracion" className="icon-button topbar-action-btn" aria-label="Configuración">
+
+          <Link
+            to="/configuracion"
+            className="icon-button topbar-action-btn"
+            aria-label="Configuración"
+          >
             <Settings size={26} strokeWidth={2} />
           </Link>
         </div>
@@ -272,8 +364,8 @@ export const History = () => {
       <div className="page-title">
         <h1>Historial</h1>
         <p className="history-subtitle">
-          Datos de <Link to="/evaluacion">registrar presión</Link>. Cambie semana, mes o año para ver el
-          gráfico y el promedio.
+          Datos de <Link to="/evaluacion">registrar presión</Link>. Cambie
+          semana, mes o año para ver el gráfico y el promedio.
         </p>
       </div>
 
@@ -285,15 +377,33 @@ export const History = () => {
         >
           Semana
         </button>
-        <button type="button" className={range === 'mes' ? 'active' : ''} onClick={() => setRange('mes')}>
+
+        <button
+          type="button"
+          className={range === 'mes' ? 'active' : ''}
+          onClick={() => setRange('mes')}
+        >
           Mes
         </button>
-        <button type="button" className={range === 'anio' ? 'active' : ''} onClick={() => setRange('anio')}>
+
+        <button
+          type="button"
+          className={range === 'anio' ? 'active' : ''}
+          onClick={() => setRange('anio')}
+        >
           Año
         </button>
       </section>
 
-      {filtered.length === 0 ? (
+      {error ? <section className="home-muted-info">{error}</section> : null}
+
+      {loading ? (
+        <section className="empty-state">
+          <ChartNoAxesCombined size={48} />
+          <h2>Cargando historial...</h2>
+          <p>Estamos obteniendo tus registros de presión.</p>
+        </section>
+      ) : filtered.length === 0 ? (
         <section className="empty-state">
           <ChartNoAxesCombined size={48} />
           <h2>No hay registros en este periodo</h2>
@@ -307,11 +417,15 @@ export const History = () => {
           <section className="pressure-average-card history-summary-card">
             <div className="average-header">
               <span>PROMEDIO {averageLabel(range)}</span>
-              <span className={`history-status-badge history-status-badge--${avgStatus.variant}`}>
+
+              <span
+                className={`history-status-badge history-status-badge--${avgStatus.variant}`}
+              >
                 <i className="history-status-dot" aria-hidden />
                 {avgStatus.label}
               </span>
             </div>
+
             <p className="history-average-reading">
               {average.systolic}/{average.diastolic} mmHg
             </p>
@@ -325,22 +439,39 @@ export const History = () => {
                   className="history-chart-svg"
                 >
                   <defs>
-                    <linearGradient id="historyAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient
+                      id="historyAreaGrad"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
                       <stop offset="0%" stopColor="rgba(46, 125, 93, 0.35)" />
-                      <stop offset="100%" stopColor="rgba(156, 210, 238, 0.12)" />
+                      <stop
+                        offset="100%"
+                        stopColor="rgba(156, 210, 238, 0.12)"
+                      />
                     </linearGradient>
                   </defs>
-                  <path d={chartSvg.areaD} fill="url(#historyAreaGrad)" className="history-area-fill" />
+
+                  <path
+                    d={chartSvg.areaD}
+                    fill="url(#historyAreaGrad)"
+                    className="history-area-fill"
+                  />
+
                   <polyline
                     points={chartSvg.lineSys}
                     fill="none"
                     className="history-line history-line--sys"
                   />
+
                   <polyline
                     points={chartSvg.lineDia}
                     fill="none"
                     className="history-line history-line--dia"
                   />
+
                   {chartSvg.sysPts.map((p, i) => (
                     <circle
                       key={`sys-${i}`}
@@ -350,6 +481,7 @@ export const History = () => {
                       className="history-point history-point--sys"
                     />
                   ))}
+
                   {chartSvg.diaPts.map((p, i) => (
                     <circle
                       key={`dia-${i}`}
@@ -360,11 +492,13 @@ export const History = () => {
                     />
                   ))}
                 </svg>
+
                 <div className="history-chart-legend-inline">
                   <span>
                     <i className="legend-dot legend-sys" />
                     Sistólica
                   </span>
+
                   <span>
                     <i className="legend-dot legend-dia-soft" />
                     Diastólica
@@ -376,6 +510,7 @@ export const History = () => {
 
           <div className="history-register-header">
             <h3>Registros recientes</h3>
+
             <button type="button" className="history-filter-btn">
               <Filter size={14} />
               FILTRAR
@@ -386,32 +521,49 @@ export const History = () => {
             {groupedByDate.map((group) => (
               <div key={group.timeKey}>
                 <h4 className="history-date-heading">{group.heading}</h4>
-                {group.records.map((item, index) => (
+
+                {group.records.map((item) => (
                   <Link
-                    key={`${item.createdAt}-${index}`}
-                    to="/evaluacion"
+                    key={item.id}
+                    to={`/resultado?id=${item.id}`}
                     className="measurement-item measurement-item--link"
                   >
                     <div className="measurement-item-left">
-                      <span className={`measurement-bar ${rowBarClass(item.systolic, item.diastolic)}`} />
+                      <span
+                        className={`measurement-bar ${rowBarClass(
+                          item.systolic_bp,
+                          item.diastolic_bp
+                        )}`}
+                      />
+
                       <div>
                         <strong>
-                          {item.systolic}/{item.diastolic} mmHg
+                          {item.systolic_bp}/{item.diastolic_bp} mmHg
                         </strong>
+
                         <small>
-                          {new Date(item.createdAt).toLocaleTimeString('es-MX', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                          {new Date(recordDate(item)).toLocaleTimeString(
+                            'es-MX',
+                            {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            }
+                          )}
                         </small>
                       </div>
                     </div>
+
                     <div className="measurement-item-mid">
                       <Heart size={14} className="measurement-pulse-icon" />
-                      <strong>{item.pulse}</strong>
+                      <strong>{item.heart_rate_bpm}</strong>
                       <small>LPM</small>
                     </div>
-                    <ChevronRight className="measurement-chevron" size={20} aria-hidden />
+
+                    <ChevronRight
+                      className="measurement-chevron"
+                      size={20}
+                      aria-hidden
+                    />
                   </Link>
                 ))}
               </div>

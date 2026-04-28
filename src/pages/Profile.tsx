@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Activity,
   Bell,
@@ -10,31 +11,107 @@ import {
   UserRound,
 } from 'lucide-react';
 import { HealthCard } from '../components/HealthCard';
-import { getPressureHistory, getUserProfile } from '../services/expertApi';
+import {
+  getCurrentUser,
+  getLatestVital,
+  getRiskProfile,
+} from '../api/profile.api';
+
+const sexLabels = {
+  male: 'Hombre',
+  female: 'Mujer',
+};
 
 export const Profile = () => {
-  const profile = getUserProfile();
-  const history = getPressureHistory();
-  const last = history[0];
+  const navigate = useNavigate();
 
-  const displayName = profile.displayName.trim() || 'Nombre';
+  const [user, setUser] = useState<any>(null);
+  const [riskProfile, setRiskProfile] = useState<any>(null);
+  const [latestVital, setLatestVital] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        setLoading(true);
+
+        const [userRes, riskRes, vitalRes] = await Promise.all([
+          getCurrentUser(),
+          getRiskProfile(),
+          getLatestVital(),
+        ]);
+
+        setUser(userRes.data);
+        setRiskProfile(riskRes.data);
+        setLatestVital(vitalRes.data?.[0] ?? null);
+      } catch (error) {
+        console.error('Error cargando perfil:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadProfile();
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+    navigate('/login');
+  };
+
+  const displayName = user?.full_name?.trim() || 'Nombre';
 
   const subtitleParts: string[] = [];
-  if (profile.age != null) subtitleParts.push(`${profile.age} años`);
-  if (profile.hasHypertension) subtitleParts.push('Hipertensión');
-  if (profile.hasDiabetes) subtitleParts.push('Diabetes');
+
+  if (riskProfile?.age != null) {
+    subtitleParts.push(`${riskProfile.age} años`);
+  }
+
+  if (riskProfile?.sex) {
+    subtitleParts.push(
+      sexLabels[riskProfile.sex as keyof typeof sexLabels] ?? riskProfile.sex
+    );
+  }
+
+  if (riskProfile?.has_diabetes) {
+    subtitleParts.push('Diabetes');
+  }
+
+  if (riskProfile?.is_smoker) {
+    subtitleParts.push('Fumador');
+  }
+
   if (subtitleParts.length === 0) {
     subtitleParts.push('Paciente cardiovascular');
   }
+
   const ageLine = subtitleParts.join(' · ');
 
-  const pressureLabel = last ? `${last.systolic}/${last.diastolic}` : 'Sin registro';
-  const statusLabel = last ? 'Datos recientes' : 'Registre en Inicio';
+  const pressureLabel = latestVital
+    ? `${latestVital.systolic_bp}/${latestVital.diastolic_bp}`
+    : 'Sin registro';
+
+  const statusLabel = latestVital
+    ? latestVital.bp_category_label
+    : 'Registre en Inicio';
+
+  if (loading) {
+    return (
+      <div className="screen profile-screen">
+        <HealthCard>
+          <h2>Cargando perfil...</h2>
+          <p>Estamos obteniendo tu información.</p>
+        </HealthCard>
+      </div>
+    );
+  }
 
   return (
     <div className="screen profile-screen">
       <div className="page-topbar profile-screen-topbar">
         <h1>Mi registro</h1>
+
         <div className="home-topbar-actions">
           <Link
             to="/configuracion/notificaciones"
@@ -43,26 +120,30 @@ export const Profile = () => {
           >
             <Bell size={26} strokeWidth={2} />
           </Link>
-          <Link to="/configuracion" className="icon-button topbar-action-btn" aria-label="Configuración">
+
+          <Link
+            to="/configuracion"
+            className="icon-button topbar-action-btn"
+            aria-label="Configuración"
+          >
             <Settings size={26} strokeWidth={2} />
           </Link>
         </div>
       </div>
 
       <div className="profile-card">
-        <div className={profile.photoDataUrl ? 'profile-avatar profile-avatar--photo' : 'profile-avatar'}>
-          {profile.photoDataUrl ? (
-            <img src={profile.photoDataUrl} alt="" />
-          ) : (
-            <UserRound size={56} />
-          )}
+        <div className="profile-avatar">
+          <UserRound size={56} />
         </div>
 
         <h1>{displayName}</h1>
         <p>{ageLine}</p>
 
-        <Link to="/configuracion/perfil" className="primary-button profile-edit-cta">
-          Editar nombre, foto y datos
+        <Link
+          to="/globorisk"
+          className="primary-button profile-edit-cta"
+        >
+          Completar formulario GLOBORISK
         </Link>
 
         <div className="profile-stats">
@@ -106,18 +187,45 @@ export const Profile = () => {
         </div>
       </HealthCard>
 
+      <HealthCard>
+        <h2>Riesgo cardiovascular</h2>
+
+        {riskProfile ? (
+          <>
+            <div className="info-row">
+              <ShieldCheck size={19} />
+              <div>
+                <span>Resultado GLOBORISK</span>
+                <strong>
+                  {riskProfile.is_applicable
+                    ? `${riskProfile.risk_display} · ${riskProfile.risk_category_label}`
+                    : 'No aplicable'}
+                </strong>
+              </div>
+            </div>
+
+            <p>{riskProfile.calculation_message}</p>
+          </>
+        ) : (
+          <p>
+            Aún no has completado tu perfil de riesgo cardiovascular.
+          </p>
+        )}
+      </HealthCard>
+
       <HealthCard className="success-card">
         <ShieldCheck size={24} />
+
         <div>
           <h3>Privacidad</h3>
           <p>
-            En esta versión los datos se guardan localmente en el navegador. Después podrán
-            enviarse a PostgreSQL mediante Flask.
+            Tus datos se guardan en tu cuenta y se consultan mediante el backend
+            protegido con sesión.
           </p>
         </div>
       </HealthCard>
 
-      <button type="button" className="logout-button">
+      <button type="button" className="logout-button" onClick={handleLogout}>
         <LogOut size={18} />
         Cerrar sesión
       </button>

@@ -12,9 +12,19 @@ import {
   Settings,
   Stethoscope,
   ShieldCheck,
+  AlertTriangle,
+    Activity,
+  TrendingUp,
 } from 'lucide-react';
+
 import { HomeHealthTips } from '../components/HomeHealthTips';
-import { getEmergencyContact, getNotificationSettings, getUserProfile } from '../services/expertApi';
+import {
+  getActiveAlerts,
+  getCurrentUser,
+  getDueMedications,
+  getLatestVitals,
+  getWeeklyTrends,
+} from '../api/home.api';
 
 const profileInitial = (name: string) => {
   const t = name.trim();
@@ -29,60 +39,184 @@ const greetingForHour = (d: Date): string => {
   return 'Buenas noches';
 };
 
+
+const safeNumber = (value: unknown, fallback = 0) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const pressureBarHeight = (value: unknown, min = 50, max = 190) => {
+  const n = safeNumber(value);
+  if (!n) return 20;
+
+  const percent = ((n - min) / (max - min)) * 100;
+  return `${Math.min(100, Math.max(18, percent))}%`;
+};
+
+const changeLabel = (value: unknown) => {
+  const n = safeNumber(value);
+  if (n > 0) return `+${n.toFixed(1)}`;
+  if (n < 0) return n.toFixed(1);
+  return '0.0';
+};
+
+const changeClass = (value: unknown) => {
+  const n = safeNumber(value);
+  if (n > 0) return 'trend-change trend-change--up';
+  if (n < 0) return 'trend-change trend-change--down';
+  return 'trend-change';
+};
+
+
 export const Home = () => {
   const [now, setNow] = useState(() => new Date());
-  const userProfile = getUserProfile();
-  const emergencyContact = getEmergencyContact();
-  const settings = getNotificationSettings();
+
+  const [user, setUser] = useState<any>(null);
+  const [latestVital, setLatestVital] = useState<any>(null);
+  const [trends, setTrends] = useState<any>(null);
+  const [dueMedications, setDueMedications] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
+
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const tick = () => setNow(new Date());
     tick();
+
     const id = window.setInterval(tick, 60_000);
     return () => window.clearInterval(id);
   }, []);
 
-  const cleanedPhone = emergencyContact?.phone.replace(/[^\d+]/g, '') ?? '';
+  useEffect(() => {
+    async function loadDashboard() {
+      try {
+        setLoading(true);
 
-  const relationLabel =
-    emergencyContact?.relation === 'hijo'
-      ? 'Hijo'
-      : emergencyContact?.relation === 'hija'
-        ? 'Hija'
-        : emergencyContact?.relation === 'cuidador'
-          ? 'Cuidador'
-          : 'Contacto';
+        const [userRes, vitalsRes, trendsRes, medsRes, alertsRes] =
+          await Promise.all([
+            getCurrentUser(),
+            getLatestVitals(),
+            getWeeklyTrends(),
+            getDueMedications(),
+            getActiveAlerts(),
+          ]);
+
+        setUser(userRes.data);
+        setLatestVital(vitalsRes.data?.[0] ?? null);
+        setTrends(trendsRes.data ?? null);
+        setDueMedications(medsRes.data ?? []);
+        setAlerts(alertsRes.data ?? []);
+      } catch (error) {
+        console.error('Error cargando dashboard:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDashboard();
+  }, []);
+
+  const displayName = user?.full_name ?? 'Paciente';
+  const lastRecordDate = latestVital?.recorded_at
+    ? new Date(latestVital.recorded_at)
+    : null;
+
+  const formattedLastRecord = lastRecordDate
+    ? lastRecordDate.toLocaleTimeString('es-MX', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      })
+    : 'Sin mediciones';
+
+  const currentSummary = trends?.current_summary;
+  const dangerousTrend = trends?.dangerous_trends?.[0];
+
+  const previousSummary = trends?.previous_summary;
+const changes = trends?.changes;
+
+const weeklyMetrics = [
+  {
+    label: 'Sistólica',
+    unit: 'mmHg',
+    current: currentSummary?.average_systolic_bp,
+    previous: previousSummary?.average_systolic_bp,
+    change: changes?.average_systolic_bp_change,
+  },
+  {
+    label: 'Diastólica',
+    unit: 'mmHg',
+    current: currentSummary?.average_diastolic_bp,
+    previous: previousSummary?.average_diastolic_bp,
+    change: changes?.average_diastolic_bp_change,
+  },
+  {
+    label: 'Pulso',
+    unit: 'lpm',
+    current: currentSummary?.average_heart_rate_bpm,
+    previous: previousSummary?.average_heart_rate_bpm,
+    change: changes?.average_heart_rate_bpm_change,
+  },
+];
+
+const pressureRangeLabel =
+  currentSummary?.min_systolic_bp && currentSummary?.max_systolic_bp
+    ? `${currentSummary.min_systolic_bp}-${currentSummary.max_systolic_bp} mmHg`
+    : '--';
+
+const diastolicRangeLabel =
+  currentSummary?.min_diastolic_bp && currentSummary?.max_diastolic_bp
+    ? `${currentSummary.min_diastolic_bp}-${currentSummary.max_diastolic_bp} mmHg`
+    : '--';
+
+const heartRangeLabel =
+  currentSummary?.min_heart_rate_bpm && currentSummary?.max_heart_rate_bpm
+    ? `${currentSummary.min_heart_rate_bpm}-${currentSummary.max_heart_rate_bpm} lpm`
+    : '--';
+
+const totalRecords = currentSummary?.total_records ?? 0;
+
+  if (loading) {
+    return (
+      <div className="screen home-dashboard">
+        <section className="home-pressure-card">
+          <h3>Cargando información...</h3>
+          <p className="home-card-subtitle">
+            Estamos obteniendo tus datos de salud.
+          </p>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="screen home-dashboard">
       <header className="home-topbar">
         <div className="home-user">
-          {userProfile.photoDataUrl ? (
-            <div className="home-avatar home-avatar--photo">
-              <img src={userProfile.photoDataUrl} alt="" />
-            </div>
-          ) : (
-            <div className="home-avatar" aria-hidden>
-              {profileInitial(userProfile.displayName)}
-            </div>
-          )}
+          <div className="home-avatar" aria-hidden>
+            {profileInitial(displayName)}
+          </div>
 
           <div className="home-user-text">
             <span>Paciente</span>
-            <strong>Inicio</strong>
+            <strong>{displayName}</strong>
           </div>
         </div>
 
         <div className="home-topbar-actions">
           <Link
-            to="/configuracion/notificaciones"
+            to="/alertas"
             className="icon-button topbar-action-btn"
-            aria-label="Notificaciones"
+            aria-label="Alertas"
           >
             <Bell size={26} strokeWidth={2} />
           </Link>
 
-          <Link to="/configuracion" className="icon-button topbar-action-btn" aria-label="Configuración">
+          <Link
+            to="/configuracion"
+            className="icon-button topbar-action-btn"
+            aria-label="Configuración"
+          >
             <Settings size={26} strokeWidth={2} />
           </Link>
         </div>
@@ -121,111 +255,231 @@ export const Home = () => {
         <span>Este sistema no sustituye una consulta médica profesional.</span>
       </div>
 
+      {alerts.length > 0 ? (
+        <section className="home-ai-card">
+          <div className="home-card-header-icon">
+            <AlertTriangle size={28} strokeWidth={2} />
+          </div>
+
+          <div>
+            <h3>{alerts[0].title}</h3>
+            <p>{alerts[0].message}</p>
+          </div>
+        </section>
+      ) : null}
+
       <section className="home-pressure-card">
         <div className="home-pressure-card-header">
           <div>
-            <h3>Presión controlada esta semana</h3>
-            <p className="home-card-subtitle">Última medición hoy 08:30 AM</p>
+            <h3>
+              {latestVital
+                ? latestVital.bp_category_label
+                : 'Sin mediciones registradas'}
+            </h3>
+            <p className="home-card-subtitle">
+              {latestVital
+                ? `Última medición ${formattedLastRecord}`
+                : 'Registra tu primera medición'}
+            </p>
           </div>
           <Heart size={44} />
         </div>
 
         <div className="pressure-gauge">
           <div className="pressure-inner">
-            <h2>128/82</h2>
+            <h2>
+              {latestVital
+                ? `${latestVital.systolic_bp}/${latestVital.diastolic_bp}`
+                : '--/--'}
+            </h2>
             <span>mmHg</span>
           </div>
         </div>
 
         <p className="heart-rate">
           <Heart size={16} />
-          <strong>72</strong> lpm
+          <strong>{latestVital?.heart_rate_bpm ?? '--'}</strong> lpm
         </p>
 
-        <div className="home-status-box">Tu presión está en rango controlado</div>
+        <div className="home-status-box">
+          {latestVital
+            ? latestVital.initial_assessment
+            : 'Aún no hay datos suficientes para una evaluación inicial.'}
+        </div>
       </section>
 
-      {settings.aiTrends ? (
+      {dangerousTrend ? (
         <section className="home-ai-card">
           <div className="home-card-header-icon">
             <Stethoscope size={28} strokeWidth={2} />
           </div>
 
           <div>
-            <h3>Análisis de hipertensión</h3>
-            <p>Posible falta de adherencia nocturna. No registraste tu toma de Amlodipino ayer.</p>
+            <h3>{dangerousTrend.title}</h3>
+            <p>{dangerousTrend.message}</p>
           </div>
         </section>
       ) : null}
 
-      {settings.medicationReminders ? (
-        <section className="home-med-card">
-          <h3>
-            <span className="home-card-header-icon">
-              <PillBottle size={28} strokeWidth={2} />
-            </span>
-            Medicamentos de hoy
-          </h3>
-
-          <div className="med-item med-item-done">
-            <span className="med-check">
-              <Check size={14} />
-            </span>
-
-            <div>
-              <strong>Losartan</strong>
-              <p>8:00 AM • 50mg</p>
-            </div>
-
-            <span className="med-status">Tomado</span>
-          </div>
-
-          <div className="med-item">
-            <span className="med-check med-check-empty" />
-
-            <div>
-              <strong>Amlodipino</strong>
-              <p>8:00 PM • 5mg</p>
-            </div>
-          </div>
-
-          <button className="primary-button home-mark-button" type="button">
-            <Check size={18} />
-            Marcar como tomado
-          </button>
-        </section>
-      ) : null}
-
-      <section className="home-trend-card">
-        <h3>Tendencia semanal</h3>
-
-        <div className="home-chart">
-          {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((day, index) => (
-            <div key={`${day}-${index}`} className="bar-day">
-              <span className="bar-top" />
-              <span className="bar-bottom" />
-              <small>{day}</small>
-            </div>
-          ))}
-        </div>
-
-        <div className="home-chart-legend">
-          <span>
-            <i className="legend-dot legend-sys" />
-            Sistólica
+      <section className="home-med-card">
+        <h3>
+          <span className="home-card-header-icon">
+            <PillBottle size={28} strokeWidth={2} />
           </span>
+          Medicamentos de hoy
+        </h3>
 
-          <span>
-            <i className="legend-dot legend-dia" />
-            Diastólica
-          </span>
-        </div>
+        {dueMedications.length > 0 ? (
+          dueMedications.slice(0, 2).map((item) => (
+            <div
+              key={item.medication.id}
+              className={`med-item ${
+                item.status === 'completed' ? 'med-item-done' : ''
+              }`}
+            >
+              <span
+                className={
+                  item.status === 'completed'
+                    ? 'med-check'
+                    : 'med-check med-check-empty'
+                }
+              >
+                {item.status === 'completed' ? <Check size={14} /> : null}
+              </span>
+
+              <div>
+                <strong>{item.medication.name}</strong>
+                <p>
+                  {item.medication.first_dose_time} • {item.medication.dose_mg}
+                  mg
+                </p>
+              </div>
+
+              {item.status === 'completed' ? (
+                <span className="med-status">Tomado</span>
+              ) : null}
+            </div>
+          ))
+        ) : (
+          <p className="home-card-subtitle">
+            No hay medicamentos pendientes registrados.
+          </p>
+        )}
+
+        <Link to="/medicacion" className="primary-button home-mark-button">
+          <Check size={18} />
+          Ver medicamentos
+        </Link>
       </section>
+
+    <section className="home-trend-card home-trend-card--enhanced">
+  <div className="home-trend-head">
+    <div>
+      <h3>Tendencia semanal</h3>
+      <p className="home-card-subtitle">
+        Comparación contra el periodo anterior
+      </p>
+    </div>
+
+    <span className="home-card-header-icon">
+      <TrendingUp size={22} />
+    </span>
+  </div>
+
+  <div className="weekly-trend-bars">
+    {weeklyMetrics.map((metric) => (
+      <article key={metric.label} className="weekly-trend-item">
+        <div className="weekly-trend-bars-wrap">
+          <span
+            className="weekly-bar weekly-bar--previous"
+            style={{
+              height: pressureBarHeight(metric.previous),
+            }}
+            title="Periodo anterior"
+          />
+
+          <span
+            className="weekly-bar weekly-bar--current"
+            style={{
+              height: pressureBarHeight(metric.current),
+            }}
+            title="Periodo actual"
+          />
+        </div>
+
+        <div className="weekly-trend-info">
+          <strong>{metric.label}</strong>
+
+          <span>
+            {metric.current != null
+              ? `${Number(metric.current).toFixed(1)} ${metric.unit}`
+              : `-- ${metric.unit}`}
+          </span>
+
+          <small className={changeClass(metric.change)}>
+            {changeLabel(metric.change)} vs anterior
+          </small>
+        </div>
+      </article>
+    ))}
+  </div>
+
+  <div className="home-chart-legend home-chart-legend--enhanced">
+    <span>
+      <i className="legend-dot legend-dia" />
+      Semana anterior
+    </span>
+
+    <span>
+      <i className="legend-dot legend-sys" />
+      Semana actual
+    </span>
+  </div>
+</section>
+
+<section className="home-insight-card">
+  <div className="home-insight-head">
+    <span className="home-card-header-icon">
+      <Activity size={22} />
+    </span>
+
+    <div>
+      <h3>Resumen de variación</h3>
+      <p>Un vistazo rápido a los cambios recientes</p>
+    </div>
+  </div>
+
+  <div className="home-insight-grid">
+    <div className="insight-stat">
+      <span>Registros</span>
+      <strong>{totalRecords}</strong>
+      <small>esta semana</small>
+    </div>
+
+    <div className="insight-stat">
+      <span>Rango sistólico</span>
+      <strong>{pressureRangeLabel}</strong>
+      <small>mínimo - máximo</small>
+    </div>
+
+    <div className="insight-stat">
+      <span>Rango diastólico</span>
+      <strong>{diastolicRangeLabel}</strong>
+      <small>mínimo - máximo</small>
+    </div>
+
+    <div className="insight-stat">
+      <span>Rango pulso</span>
+      <strong>{heartRangeLabel}</strong>
+      <small>mínimo - máximo</small>
+    </div>
+  </div>
+</section>
 
       <section className="home-actions-grid">
         <Link to="/evaluacion" className="action-card action-primary">
           <ClipboardPlus size={22} />
-          {settings.dailyMeasurement ? 'Registrar presión' : 'Nueva medición'}
+          Registrar presión
         </Link>
 
         <Link to="/medicacion" className="action-card">
@@ -244,34 +498,26 @@ export const Home = () => {
         </Link>
       </section>
 
-      {!settings.criticalAlerts && !settings.aiTrends && !settings.medicationReminders ? (
-        <section className="home-muted-info">
-          Varias alertas están desactivadas. Puedes reactivarlas desde la sección de configuración.
-        </section>
-      ) : null}
+      <section className="home-emergency-card">
+        <div>
+          <p>Contacto de emergencia</p>
+          <h3>No configurado</h3>
+          <small>Agrega un contacto desde configuración</small>
+        </div>
 
-      {emergencyContact ? (
-        <section className="home-emergency-card">
-          <div>
-            <p>Contacto de emergencia</p>
-            <h3>{emergencyContact.fullName}</h3>
-            <small>{relationLabel}</small>
-          </div>
+        <div className="home-emergency-actions">
+          <a href="tel:" className="home-call-btn">
+            <PhoneCall size={15} />
+            Llamar
+          </a>
 
-          <div className="home-emergency-actions">
-            <a href={`tel:${cleanedPhone}`} className="home-call-btn">
-              <PhoneCall size={15} />
-              Llamar
-            </a>
+          <Link to="/contacto-emergencia" className="home-edit-contact-link">
+            Editar
+          </Link>
+        </div>
+      </section>
 
-            <Link to="/contacto-emergencia" className="home-edit-contact-link">
-              Editar
-            </Link>
-          </div>
-        </section>
-      ) : null}
-
-      {settings.healthTips ? <HomeHealthTips /> : null}
+      <HomeHealthTips />
     </div>
   );
 };
