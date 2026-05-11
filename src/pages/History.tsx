@@ -1,156 +1,136 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Bell,
-  ChartNoAxesCombined,
-  ChevronRight,
-  Filter,
-  Heart,
-  Settings,
-} from 'lucide-react';
+import { Bell, ChartNoAxesCombined, ChevronRight, Filter, Heart } from 'lucide-react';
 import { getCurrentUser } from '../api/home.api';
 import { getVitals, type VitalRecord } from '../api/vitals.api';
 
 type MeasurementRange = 'semana' | 'mes' | 'anio';
 type ChartPoint = { sys: number; dia: number; t: number };
+type BpStatusVariant = 'normal' | 'attention' | 'high';
+
+const RANGE_LABELS: Record<MeasurementRange, string> = { semana: 'SEMANAL', mes: 'MENSUAL', anio: 'ANUAL' };
 
 const profileInitial = (name: string) => {
-  const t = name.trim();
-  if (!t) return 'N';
-  return t[0].toUpperCase();
+  const value = name.trim();
+  return value ? value[0].toUpperCase() : 'N';
 };
 
-function recordDate(item: VitalRecord) {
-  return item.recorded_at || item.created_at;
-}
+const recordDate = (item: VitalRecord) => item.recorded_at || item.created_at;
 
-function avgReadings(readings: VitalRecord[]): { sys: number; dia: number } {
-  if (readings.length === 0) return { sys: 0, dia: 0 };
+const formatHour = (date: string) =>
+  new Date(date).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
 
-  const s = readings.reduce((a, r) => a + r.systolic_bp, 0);
-  const d = readings.reduce((a, r) => a + r.diastolic_bp, 0);
+const formatGroupHeading = (date: Date) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-  return {
-    sys: Math.round(s / readings.length),
-    dia: Math.round(d / readings.length),
-  };
-}
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
 
-function buildChartSeries(
-  readings: VitalRecord[],
-  range: MeasurementRange
-): ChartPoint[] {
-  const sorted = [...readings].sort(
-    (a, b) =>
-      new Date(recordDate(a)).getTime() - new Date(recordDate(b)).getTime()
+  const cleanDate = new Date(date);
+  cleanDate.setHours(0, 0, 0, 0);
+
+  const rest = date.toLocaleDateString('es-MX', { day: 'numeric', month: 'long' }).toUpperCase();
+
+  if (cleanDate.getTime() === today.getTime()) return `HOY, ${rest}`;
+  if (cleanDate.getTime() === yesterday.getTime()) return `AYER, ${rest}`;
+
+  return `${date.toLocaleDateString('es-MX', { weekday: 'long' }).toUpperCase()}, ${rest}`;
+};
+
+const avgReadings = (readings: VitalRecord[]) => {
+  if (!readings.length) return { sys: 0, dia: 0 };
+
+  const totals = readings.reduce(
+    (acc, item) => ({ sys: acc.sys + item.systolic_bp, dia: acc.dia + item.diastolic_bp }),
+    { sys: 0, dia: 0 }
   );
 
-  if (sorted.length === 0) return [];
+  return { sys: Math.round(totals.sys / readings.length), dia: Math.round(totals.dia / readings.length) };
+};
+
+const bpStatus = (sys: number, dia: number): { label: string; variant: BpStatusVariant } => {
+  if (sys >= 180 || dia >= 110) return { label: 'CRÍTICO', variant: 'high' };
+  if (sys >= 140 || dia >= 90) return { label: 'ALTO', variant: 'high' };
+  if (sys >= 130 || dia >= 85) return { label: 'ATENCIÓN', variant: 'attention' };
+  return { label: 'NORMAL', variant: 'normal' };
+};
+
+const rowBarClass = (sys: number, dia: number) => {
+  const status = bpStatus(sys, dia);
+  if (status.variant === 'high') return 'measurement-bar--high';
+  if (status.variant === 'attention') return 'measurement-bar--mid';
+  return 'measurement-bar--ok';
+};
+
+const rangeDays = (range: MeasurementRange) => {
+  if (range === 'semana') return 7;
+  if (range === 'mes') return 30;
+  return 365;
+};
+
+const buildChartSeries = (readings: VitalRecord[], range: MeasurementRange): ChartPoint[] => {
+  const sorted = [...readings].sort(
+    (a, b) => new Date(recordDate(a)).getTime() - new Date(recordDate(b)).getTime()
+  );
+
+  if (!sorted.length) return [];
 
   if (range === 'semana') {
-    return sorted.map((r) => ({
-      sys: r.systolic_bp,
-      dia: r.diastolic_bp,
-      t: new Date(recordDate(r)).getTime(),
+    return sorted.map((item) => ({
+      sys: item.systolic_bp,
+      dia: item.diastolic_bp,
+      t: new Date(recordDate(item)).getTime(),
     }));
   }
 
   if (range === 'mes') {
     const byDay = new Map<number, VitalRecord[]>();
 
-    for (const r of sorted) {
-      const d = new Date(recordDate(r));
-      d.setHours(0, 0, 0, 0);
+    sorted.forEach((item) => {
+      const day = new Date(recordDate(item));
+      day.setHours(0, 0, 0, 0);
+      const key = day.getTime();
+      byDay.set(key, [...(byDay.get(key) ?? []), item]);
+    });
 
-      const k = d.getTime();
-      const arr = byDay.get(k) ?? [];
-
-      arr.push(r);
-      byDay.set(k, arr);
-    }
-
-    return Array.from(byDay.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([t, arr]) => {
-        const { sys, dia } = avgReadings(arr);
-        return { sys, dia, t };
-      });
+    return [...byDay.entries()].sort(([a], [b]) => a - b).map(([t, items]) => {
+      const avg = avgReadings(items);
+      return { sys: avg.sys, dia: avg.dia, t };
+    });
   }
 
   const byMonth = new Map<string, VitalRecord[]>();
 
-  for (const r of sorted) {
-    const d = new Date(recordDate(r));
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-      2,
-      '0'
-    )}`;
+  sorted.forEach((item) => {
+    const day = new Date(recordDate(item));
+    const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}`;
+    byMonth.set(key, [...(byMonth.get(key) ?? []), item]);
+  });
 
-    const arr = byMonth.get(key) ?? [];
-    arr.push(r);
-    byMonth.set(key, arr);
-  }
+  return [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([key, items]) => {
+    const [year, month] = key.split('-').map(Number);
+    const avg = avgReadings(items);
+    return { sys: avg.sys, dia: avg.dia, t: new Date(year, month - 1, 1).getTime() };
+  });
+};
 
-  return Array.from(byMonth.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, arr]) => {
-      const [y, m] = key.split('-').map(Number);
-      const { sys, dia } = avgReadings(arr);
+const createSmoothPath = (points: Array<{ x: number; y: number }>) => {
+  if (!points.length) return '';
+  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
 
-      return { sys, dia, t: new Date(y, m - 1, 1).getTime() };
-    });
-}
+  return points.reduce((path, point, index) => {
+    if (index === 0) return `M ${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
 
-function averageLabel(range: MeasurementRange): string {
-  if (range === 'semana') return 'SEMANAL';
-  if (range === 'mes') return 'MENSUAL';
-  return 'ANUAL';
-}
+    const previous = points[index - 1];
+    const middleX = (previous.x + point.x) / 2;
 
-function bpStatus(
-  sys: number,
-  dia: number
-): { label: string; variant: 'normal' | 'attention' | 'high' } {
-  if (sys >= 180 || dia >= 110) return { label: 'CRÍTICO', variant: 'high' };
-  if (sys >= 140 || dia >= 90) return { label: 'ALTO', variant: 'high' };
-  if (sys >= 130 || dia >= 85) return { label: 'ATENCIÓN', variant: 'attention' };
-  return { label: 'NORMAL', variant: 'normal' };
-}
-
-function rowBarClass(sys: number, dia: number): string {
-  const st = bpStatus(sys, dia);
-
-  if (st.variant === 'high') return 'measurement-bar--high';
-  if (st.variant === 'attention') return 'measurement-bar--mid';
-
-  return 'measurement-bar--ok';
-}
-
-function formatGroupHeading(date: Date): string {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-
-  const y = new Date(start);
-  y.setDate(y.getDate() - 1);
-
-  const d0 = new Date(date);
-  d0.setHours(0, 0, 0, 0);
-
-  const rest = date
-    .toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })
-    .toUpperCase();
-
-  if (d0.getTime() === start.getTime()) return `HOY, ${rest}`;
-  if (d0.getTime() === y.getTime()) return `AYER, ${rest}`;
-
-  return `${date
-    .toLocaleDateString('es-MX', { weekday: 'long' })
-    .toUpperCase()}, ${rest}`;
-}
+    return `${path} C ${middleX.toFixed(1)} ${previous.y.toFixed(1)}, ${middleX.toFixed(1)} ${point.y.toFixed(1)}, ${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+  }, '');
+};
 
 export const History = () => {
   const [range, setRange] = useState<MeasurementRange>('semana');
-
   const [user, setUser] = useState<any>(null);
   const [history, setHistory] = useState<VitalRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,18 +142,12 @@ export const History = () => {
         setLoading(true);
         setError('');
 
-        const [userRes, vitalsRes] = await Promise.all([
-          getCurrentUser(),
-          getVitals(100),
-        ]);
+        const [userRes, vitalsRes] = await Promise.all([getCurrentUser(), getVitals(100)]);
 
         setUser(userRes.data);
         setHistory(vitalsRes.data ?? []);
       } catch (err: any) {
-        setError(
-          err.response?.data?.error?.message ||
-            'No se pudo cargar el historial.'
-        );
+        setError(err.response?.data?.error?.message || 'No se pudo cargar el historial.');
       } finally {
         setLoading(false);
       }
@@ -182,139 +156,66 @@ export const History = () => {
     loadHistory();
   }, []);
 
-  const displayName = user?.full_name ?? 'Nombre';
+  const displayName = user?.full_name ?? user?.name ?? 'Nombre';
+  const avatarUrl = user?.photo_url ?? user?.avatar_url ?? user?.profile_photo_url ?? '';
 
   const filtered = useMemo(() => {
-    const now = new Date();
-    const days = range === 'semana' ? 7 : range === 'mes' ? 30 : 365;
-
-    const start = new Date(now);
-    start.setDate(start.getDate() - days);
+    const start = new Date();
+    start.setDate(start.getDate() - rangeDays(range));
     start.setHours(0, 0, 0, 0);
 
     return history.filter((item) => new Date(recordDate(item)) >= start);
   }, [history, range]);
 
-  const average = useMemo(() => {
-    if (filtered.length === 0) return { systolic: 0, diastolic: 0 };
-
-    const totals = filtered.reduce(
-      (acc, item) => {
-        acc.systolic += item.systolic_bp;
-        acc.diastolic += item.diastolic_bp;
-        return acc;
-      },
-      { systolic: 0, diastolic: 0 }
-    );
-
-    return {
-      systolic: Math.round(totals.systolic / filtered.length),
-      diastolic: Math.round(totals.diastolic / filtered.length),
-    };
-  }, [filtered]);
-
-  const avgStatus = useMemo(
-    () => bpStatus(average.systolic, average.diastolic),
-    [average.systolic, average.diastolic]
-  );
-
-  const chartSeries = useMemo(
-    () => buildChartSeries(filtered, range),
-    [filtered, range]
-  );
+  const average = useMemo(() => avgReadings(filtered), [filtered]);
+  const averageStatus = useMemo(() => bpStatus(average.sys, average.dia), [average.sys, average.dia]);
+  const chartSeries = useMemo(() => buildChartSeries(filtered, range), [filtered, range]);
 
   const chartSvg = useMemo(() => {
-    if (chartSeries.length === 0) return null;
+    if (!chartSeries.length) return null;
 
-    const W = 320;
-    const H = 168;
-    const pad = { t: 16, r: 14, b: 28, l: 14 };
-    const innerW = W - pad.l - pad.r;
-    const innerH = H - pad.t - pad.b;
+    const width = 330;
+    const height = 170;
+    const pad = { top: 22, right: 8, bottom: 22, left: 8 };
+    const innerW = width - pad.left - pad.right;
+    const innerH = height - pad.top - pad.bottom;
 
-    const allVals = chartSeries.flatMap((p) => [p.sys, p.dia]);
-    let minBp = Math.min(...allVals) - 8;
-    let maxBp = Math.max(...allVals) + 8;
+    const values = chartSeries.flatMap((point) => [point.sys, point.dia]);
+    let minBp = Math.min(...values) - 10;
+    let maxBp = Math.max(...values) + 10;
 
-    if (maxBp - minBp < 20) {
-      const mid = (maxBp + minBp) / 2;
-      minBp = mid - 12;
-      maxBp = mid + 12;
+    if (maxBp - minBp < 24) {
+      const middle = (maxBp + minBp) / 2;
+      minBp = middle - 14;
+      maxBp = middle + 14;
     }
 
-    const n = chartSeries.length;
-    const toX = (i: number) =>
-      pad.l + innerW * (n === 1 ? 0.5 : i / (n - 1));
+    const toX = (index: number) =>
+      pad.left + innerW * (chartSeries.length === 1 ? 0.5 : index / (chartSeries.length - 1));
+    const toY = (value: number) => pad.top + innerH * (1 - (value - minBp) / (maxBp - minBp));
 
-    const toY = (v: number) =>
-      pad.t + innerH * (1 - (v - minBp) / (maxBp - minBp));
+    const systolicPoints = chartSeries.map((point, index) => ({ x: toX(index), y: toY(point.sys) }));
+    const diastolicPoints = chartSeries.map((point, index) => ({ x: toX(index), y: toY(point.dia) }));
+    const systolicPath = createSmoothPath(systolicPoints);
+    const diastolicPath = createSmoothPath(diastolicPoints);
 
-    const sysPts = chartSeries.map((p, i) => ({
-      x: toX(i),
-      y: toY(p.sys),
-      ...p,
-    }));
+    const areaPath =
+      chartSeries.length === 1
+        ? `M ${systolicPoints[0].x - 20} ${systolicPoints[0].y} L ${systolicPoints[0].x + 20} ${systolicPoints[0].y} L ${diastolicPoints[0].x + 20} ${diastolicPoints[0].y} L ${diastolicPoints[0].x - 20} ${diastolicPoints[0].y} Z`
+        : `${systolicPath} L ${[...diastolicPoints]
+            .reverse()
+            .map((point) => `${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
+            .join(' L ')} Z`;
 
-    const diaPts = chartSeries.map((p, i) => ({
-      x: toX(i),
-      y: toY(p.dia),
-    }));
-
-    const lineSys = sysPts
-      .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-      .join(' ');
-
-    const lineDia = diaPts
-      .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-      .join(' ');
-
-    let areaD: string;
-
-    if (n === 1) {
-      const x = sysPts[0].x;
-      const w = 8;
-
-      areaD = `M ${(x - w).toFixed(1)} ${sysPts[0].y.toFixed(1)} L ${(
-        x + w
-      ).toFixed(1)} ${sysPts[0].y.toFixed(1)} L ${(x + w).toFixed(
-        1
-      )} ${diaPts[0].y.toFixed(1)} L ${(x - w).toFixed(1)} ${diaPts[0].y.toFixed(
-        1
-      )} Z`;
-    } else {
-      areaD =
-        `M ${sysPts[0].x.toFixed(1)} ${sysPts[0].y.toFixed(1)}` +
-        sysPts
-          .slice(1)
-          .map((p) => ` L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
-          .join('') +
-        diaPts
-          .slice()
-          .reverse()
-          .map((p) => ` L ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
-          .join('') +
-        ' Z';
-    }
-
-    return {
-      W,
-      H,
-      areaD,
-      lineSys,
-      lineDia,
-      sysPts,
-      diaPts,
-    };
+    return { width, height, areaPath, systolicPath, diastolicPath, systolicPoints, diastolicPoints };
   }, [chartSeries]);
 
   const groupedByDate = useMemo(() => {
     const groups = filtered.reduce<Record<string, VitalRecord[]>>((acc, entry) => {
-      const d = new Date(recordDate(entry));
-      d.setHours(0, 0, 0, 0);
-
-      const key = d.getTime().toString();
-      acc[key] = acc[key] ? [...acc[key], entry] : [entry];
-
+      const date = new Date(recordDate(entry));
+      date.setHours(0, 0, 0, 0);
+      const key = date.getTime().toString();
+      acc[key] = [...(acc[key] ?? []), entry];
       return acc;
     }, {});
 
@@ -324,253 +225,155 @@ export const History = () => {
         timeKey,
         heading: formatGroupHeading(new Date(Number(timeKey))),
         records: [...records].sort(
-          (a, b) =>
-            new Date(recordDate(b)).getTime() -
-            new Date(recordDate(a)).getTime()
+          (a, b) => new Date(recordDate(b)).getTime() - new Date(recordDate(a)).getTime()
         ),
       }));
   }, [filtered]);
 
   return (
-    <div className="screen measures-history-screen history-screen-v2">
-      <header className="home-topbar">
-        <div className="home-user">
-          <div className="home-avatar" aria-hidden>
-            {profileInitial(displayName)}
+    <div className="screen measures-history-screen history-screen-v3">
+      <header className="history-topbar">
+        <div className="history-user">
+          <div className="home-avatar history-avatar" aria-hidden>
+            {avatarUrl ? <img src={avatarUrl} alt="" /> : profileInitial(displayName)}
           </div>
-
           <strong>{displayName.trim() || 'Nombre'}</strong>
         </div>
 
-        <div className="home-topbar-actions">
-          <Link
-            to="/alertas"
-            className="icon-button topbar-action-btn"
-            aria-label="Alertas"
-          >
-            <Bell size={26} strokeWidth={2} />
-          </Link>
-
-          <Link
-            to="/configuracion"
-            className="icon-button topbar-action-btn"
-            aria-label="Configuración"
-          >
-            <Settings size={26} strokeWidth={2} />
-          </Link>
-        </div>
+        <Link to="/alertas" className="history-bell-btn" aria-label="Alertas">
+          <Bell size={25} strokeWidth={2} />
+        </Link>
       </header>
 
-      <div className="page-title">
-        <h1>Historial</h1>
-        <p className="history-subtitle">
-          Datos de <Link to="/evaluacion">registrar presión</Link>. Cambie
-          semana, mes o año para ver el gráfico y el promedio.
-        </p>
-      </div>
+      <main className="history-content">
+        <h1 className="history-title-main">Historial</h1>
 
-      <section className="history-range-tabs">
-        <button
-          type="button"
-          className={range === 'semana' ? 'active' : ''}
-          onClick={() => setRange('semana')}
-        >
-          Semana
-        </button>
-
-        <button
-          type="button"
-          className={range === 'mes' ? 'active' : ''}
-          onClick={() => setRange('mes')}
-        >
-          Mes
-        </button>
-
-        <button
-          type="button"
-          className={range === 'anio' ? 'active' : ''}
-          onClick={() => setRange('anio')}
-        >
-          Año
-        </button>
-      </section>
-
-      {error ? <section className="home-muted-info">{error}</section> : null}
-
-      {loading ? (
-        <section className="empty-state">
-          <ChartNoAxesCombined size={48} />
-          <h2>Cargando historial...</h2>
-          <p>Estamos obteniendo tus registros de presión.</p>
+        <section className="history-period-tabs" aria-label="Rango del historial">
+          {(['semana', 'mes', 'anio'] as MeasurementRange[]).map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={range === option ? 'active' : ''}
+              onClick={() => setRange(option)}
+            >
+              {option === 'anio' ? 'Año' : option[0].toUpperCase() + option.slice(1)}
+            </button>
+          ))}
         </section>
-      ) : filtered.length === 0 ? (
-        <section className="empty-state">
-          <ChartNoAxesCombined size={48} />
-          <h2>No hay registros en este periodo</h2>
-          <p>
-            Registre su presión cada día desde{' '}
-            <Link to="/evaluacion">Añadir medición</Link> o la pestaña Presión.
-          </p>
-        </section>
-      ) : (
-        <>
-          <section className="pressure-average-card history-summary-card">
-            <div className="average-header">
-              <span>PROMEDIO {averageLabel(range)}</span>
 
-              <span
-                className={`history-status-badge history-status-badge--${avgStatus.variant}`}
-              >
-                <i className="history-status-dot" aria-hidden />
-                {avgStatus.label}
-              </span>
+        {error ? <section className="history-message-card history-message-card--error">{error}</section> : null}
+
+        {loading ? (
+          <section className="history-message-card">
+            <ChartNoAxesCombined size={42} />
+            <h2>Cargando historial...</h2>
+            <p>Estamos obteniendo tus registros de presión.</p>
+          </section>
+        ) : (
+          <>
+            <section className="history-summary-figma-card">
+              <div className="history-summary-top">
+                <div>
+                  <span>PROMEDIO {RANGE_LABELS[range]}</span>
+                  <p>{filtered.length ? `${average.sys}/${average.dia}` : '--/--'} <small>mmHg</small></p>
+                </div>
+
+                {filtered.length ? (
+                  <span className={`history-status-badge history-status-badge--${averageStatus.variant}`}>
+                    <i className="history-status-dot" aria-hidden />
+                    {averageStatus.label}
+                  </span>
+                ) : (
+                  <span className="history-status-badge history-status-badge--empty">
+                    <i className="history-status-dot" aria-hidden />
+                    SIN DATOS
+                  </span>
+                )}
+              </div>
+
+              <div className="history-chart-figma">
+                {chartSvg ? (
+                  <svg
+                    viewBox={`0 0 ${chartSvg.width} ${chartSvg.height}`}
+                    role="img"
+                    aria-label={`Tendencia de presión ${range}`}
+                    className="history-chart-svg"
+                  >
+                    <defs>
+                      <linearGradient id="historyAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="rgba(185, 234, 210, 0.66)" />
+                        <stop offset="100%" stopColor="rgba(185, 234, 210, 0.18)" />
+                      </linearGradient>
+                    </defs>
+
+                    <path d={chartSvg.areaPath} className="history-area-fill" fill="url(#historyAreaGradient)" />
+                    <path d={chartSvg.systolicPath} className="history-line history-line--sys" />
+                    <path d={chartSvg.diastolicPath} className="history-line history-line--dia" />
+
+                    {chartSvg.systolicPoints.map((point, index) => (
+                      <circle key={`sys-${index}`} cx={point.x} cy={point.y} r="4.5" className="history-point history-point--sys" />
+                    ))}
+
+                    {chartSvg.diastolicPoints.map((point, index) => (
+                      <circle key={`dia-${index}`} cx={point.x} cy={point.y} r="4" className="history-point history-point--dia" />
+                    ))}
+                  </svg>
+                ) : (
+                  <div className="history-chart-empty">
+                    <ChartNoAxesCombined size={34} />
+                    <span>Registra mediciones para crear tu tendencia.</span>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <div className="history-register-header history-register-header--figma">
+              <h2>Registros Recientes</h2>
+              <button type="button" className="history-filter-btn">
+                <Filter size={15} />
+                FILTRAR
+              </button>
             </div>
 
-            <p className="history-average-reading">
-              {average.systolic}/{average.diastolic} mmHg
-            </p>
+            {groupedByDate.length ? (
+              <section className="measurements-list measurements-list--figma">
+                {groupedByDate.map((group) => (
+                  <div key={group.timeKey} className="history-date-group">
+                    <h3 className="history-date-heading">{group.heading}</h3>
 
-            {chartSvg ? (
-              <div className="history-chart history-chart-area">
-                <svg
-                  viewBox={`0 0 ${chartSvg.W} ${chartSvg.H}`}
-                  role="img"
-                  aria-label={`Tendencia de presión ${range}`}
-                  className="history-chart-svg"
-                >
-                  <defs>
-                    <linearGradient
-                      id="historyAreaGrad"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop offset="0%" stopColor="rgba(46, 125, 93, 0.35)" />
-                      <stop
-                        offset="100%"
-                        stopColor="rgba(156, 210, 238, 0.12)"
-                      />
-                    </linearGradient>
-                  </defs>
+                    {group.records.map((item) => (
+                      <Link key={item.id} to={`/resultado?id=${item.id}`} className="measurement-item measurement-item--figma">
+                        <div className="measurement-item-left">
+                          <span className={`measurement-bar ${rowBarClass(item.systolic_bp, item.diastolic_bp)}`} />
 
-                  <path
-                    d={chartSvg.areaD}
-                    fill="url(#historyAreaGrad)"
-                    className="history-area-fill"
-                  />
+                          <div>
+                            <strong>{item.systolic_bp}/{item.diastolic_bp} <small>mmHg</small></strong>
+                            <span>{formatHour(recordDate(item))}</span>
+                          </div>
+                        </div>
 
-                  <polyline
-                    points={chartSvg.lineSys}
-                    fill="none"
-                    className="history-line history-line--sys"
-                  />
+                        <div className="measurement-item-mid">
+                          <Heart size={18} className="measurement-pulse-icon" fill="currentColor" />
+                          <strong>{item.heart_rate_bpm}</strong>
+                          <small>LPM</small>
+                        </div>
 
-                  <polyline
-                    points={chartSvg.lineDia}
-                    fill="none"
-                    className="history-line history-line--dia"
-                  />
-
-                  {chartSvg.sysPts.map((p, i) => (
-                    <circle
-                      key={`sys-${i}`}
-                      cx={p.x}
-                      cy={p.y}
-                      r={4}
-                      className="history-point history-point--sys"
-                    />
-                  ))}
-
-                  {chartSvg.diaPts.map((p, i) => (
-                    <circle
-                      key={`dia-${i}`}
-                      cx={p.x}
-                      cy={p.y}
-                      r={3.5}
-                      className="history-point history-point--dia"
-                    />
-                  ))}
-                </svg>
-
-                <div className="history-chart-legend-inline">
-                  <span>
-                    <i className="legend-dot legend-sys" />
-                    Sistólica
-                  </span>
-
-                  <span>
-                    <i className="legend-dot legend-dia-soft" />
-                    Diastólica
-                  </span>
-                </div>
-              </div>
-            ) : null}
-          </section>
-
-          <div className="history-register-header">
-            <h3>Registros recientes</h3>
-
-            <button type="button" className="history-filter-btn">
-              <Filter size={14} />
-              FILTRAR
-            </button>
-          </div>
-
-          <section className="measurements-list">
-            {groupedByDate.map((group) => (
-              <div key={group.timeKey}>
-                <h4 className="history-date-heading">{group.heading}</h4>
-
-                {group.records.map((item) => (
-                  <Link
-                    key={item.id}
-                    to={`/resultado?id=${item.id}`}
-                    className="measurement-item measurement-item--link"
-                  >
-                    <div className="measurement-item-left">
-                      <span
-                        className={`measurement-bar ${rowBarClass(
-                          item.systolic_bp,
-                          item.diastolic_bp
-                        )}`}
-                      />
-
-                      <div>
-                        <strong>
-                          {item.systolic_bp}/{item.diastolic_bp} mmHg
-                        </strong>
-
-                        <small>
-                          {new Date(recordDate(item)).toLocaleTimeString(
-                            'es-MX',
-                            {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            }
-                          )}
-                        </small>
-                      </div>
-                    </div>
-
-                    <div className="measurement-item-mid">
-                      <Heart size={14} className="measurement-pulse-icon" />
-                      <strong>{item.heart_rate_bpm}</strong>
-                      <small>LPM</small>
-                    </div>
-
-                    <ChevronRight
-                      className="measurement-chevron"
-                      size={20}
-                      aria-hidden
-                    />
-                  </Link>
+                        <ChevronRight className="measurement-chevron" size={22} aria-hidden />
+                      </Link>
+                    ))}
+                  </div>
                 ))}
-              </div>
-            ))}
-          </section>
-        </>
-      )}
+              </section>
+            ) : (
+              <section className="history-empty-records">
+                <h2>No hay registros en este periodo</h2>
+                <p>Guarda una medición para verla aquí.</p>
+                <Link to="/evaluacion" className="primary-button">Registrar presión</Link>
+              </section>
+            )}
+          </>
+        )}
+      </main>
     </div>
   );
 };

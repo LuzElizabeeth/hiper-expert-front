@@ -11,12 +11,14 @@ import { Result } from '../pages/Result';
 import { History } from '../pages/History';
 import { Profile } from '../pages/Profile';
 import { Medication } from '../pages/Medication';
+import { MedicationsToday } from '../pages/MedicationsToday';
 import { EmergencyContact } from '../pages/EmergencyContact';
 import { Settings } from '../pages/Settings';
 import { Configuration } from '../pages/Configuration';
 import { ConfigurationProfile } from '../pages/ConfigurationProfile';
 import { Alerts } from '../pages/Alerts';
 import { GloboriskForm } from '../pages/GloboriskForm';
+import { ActionConfirmation } from '../pages/ActionConfirmation';
 
 export const router = createBrowserRouter([
   {
@@ -52,6 +54,10 @@ export const router = createBrowserRouter([
           },
           {
             path: 'medicacion',
+            element: <MedicationsToday />,
+          },
+          {
+            path: 'medicacion/nueva',
             element: <Medication />,
           },
           {
@@ -82,6 +88,10 @@ export const router = createBrowserRouter([
           {
             path: 'globorisk',
             element: <GloboriskForm />,
+          },
+          {
+            path: 'confirmacion/:type',
+            element: <ActionConfirmation />,
           },
           
 

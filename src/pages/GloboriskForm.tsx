@@ -81,6 +81,13 @@ export const GloboriskForm = () => {
       });
 
       setResult(response.data);
+      navigate('/confirmacion/globorisk-guardado', {
+        state: {
+          riskDisplay: response.data?.risk_display ?? 'Resultado actualizado',
+          riskCategory: response.data?.risk_category_label ?? 'Categoría pendiente',
+          calculationMessage: response.data?.calculation_message ?? 'Consulta el resultado con un profesional de salud.',
+        },
+      });
     } catch (err: any) {
       setError(
         err.response?.data?.error?.message ||

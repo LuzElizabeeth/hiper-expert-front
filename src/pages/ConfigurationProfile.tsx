@@ -1,5 +1,5 @@
 import { useRef, useState, type ChangeEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Camera, LogOut, ShieldCheck, UserRound } from 'lucide-react';
 import { HealthCard } from '../components/HealthCard';
 import {
@@ -25,6 +25,7 @@ const parseOptionalNumber = (raw: string): number | null => {
 };
 
 export const ConfigurationProfile = () => {
+  const navigate = useNavigate();
   const initial = getUserProfile();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -43,7 +44,6 @@ export const ConfigurationProfile = () => {
   const [smoker, setSmoker] = useState(initial.smoker);
   const [notes, setNotes] = useState(initial.notes);
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(initial.photoDataUrl);
-  const [savedMessage, setSavedMessage] = useState('');
   const [fileError, setFileError] = useState('');
 
   const history = getPressureHistory();
@@ -64,10 +64,18 @@ export const ConfigurationProfile = () => {
 
   const handleSave = () => {
     const ageNum = parseOptionalNumber(age);
+    const normalizedAge = ageNum !== null ? Math.max(0, Math.floor(ageNum)) : null;
+    const cleanName = displayName.trim() || 'Usuario';
+    const conditions = [
+      hasHypertension ? 'Hipertensión' : '',
+      hasDiabetes ? 'Diabetes' : '',
+      smoker ? 'Fumador/a' : '',
+    ].filter(Boolean).join(' · ') || 'Sin condiciones marcadas';
+
     saveUserProfile({
-      displayName: displayName.trim(),
+      displayName: cleanName,
       phone: phone.trim(),
-      age: ageNum !== null ? Math.max(0, Math.floor(ageNum)) : null,
+      age: normalizedAge,
       sex,
       weightKg: parseOptionalNumber(weightKg),
       heightCm: parseOptionalNumber(heightCm),
@@ -77,7 +85,15 @@ export const ConfigurationProfile = () => {
       notes: notes.trim(),
       photoDataUrl,
     });
-    setSavedMessage('Perfil guardado');
+
+    navigate('/confirmacion/perfil-guardado', {
+      state: {
+        displayName: cleanName,
+        phone: phone.trim() || 'Sin teléfono',
+        age: normalizedAge ?? 'Edad no registrada',
+        conditions,
+      },
+    });
   };
 
   const subtitleParts: string[] = [];
@@ -278,7 +294,6 @@ export const ConfigurationProfile = () => {
         <button className="primary-button emergency-save-btn" type="button" onClick={handleSave}>
           Guardar perfil
         </button>
-        {savedMessage ? <p className="saved-message">{savedMessage}</p> : null}
       </section>
 
       <HealthCard className="success-card">

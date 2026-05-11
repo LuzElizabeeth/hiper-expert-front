@@ -1,9 +1,33 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Heart, Save, Undo2, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Heart, Save, Undo2 } from 'lucide-react';
 import { createVitalRecord } from '../api/vitals.api';
 
 type ActiveField = 'sistolica' | 'diastolica' | 'pulso';
+
+const classifyPressure = (systolic: number, diastolic: number) => {
+  if (systolic >= 140 || diastolic >= 90) {
+    return {
+      tone: 'high',
+      label: 'Valores elevados. Guarde la medición y revise sus alertas de seguimiento.',
+      statusLabel: 'Presión elevada',
+    };
+  }
+
+  if (systolic >= 130 || diastolic >= 85) {
+    return {
+      tone: 'warning',
+      label: 'Estos valores están ligeramente elevados para su perfil.',
+      statusLabel: 'Presión ligeramente elevada',
+    };
+  }
+
+  return {
+    tone: 'normal',
+    label: 'Estos valores se encuentran en el rango normal para su perfil.',
+    statusLabel: 'Rango normal',
+  };
+};
 
 export const Evaluation = () => {
   const navigate = useNavigate();
@@ -12,7 +36,6 @@ export const Evaluation = () => {
   const [sistolica, setSistolica] = useState('120');
   const [diastolica, setDiastolica] = useState('80');
   const [pulso, setPulso] = useState('72');
-
   const [replaceOnNextTap, setReplaceOnNextTap] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -24,17 +47,9 @@ export const Evaluation = () => {
   }, [activeField, sistolica, diastolica, pulso]);
 
   const updateActiveField = (nextValue: string) => {
-    if (activeField === 'sistolica') {
-      setSistolica(nextValue);
-      return;
-    }
-
-    if (activeField === 'diastolica') {
-      setDiastolica(nextValue);
-      return;
-    }
-
-    setPulso(nextValue);
+    if (activeField === 'sistolica') return setSistolica(nextValue);
+    if (activeField === 'diastolica') return setDiastolica(nextValue);
+    return setPulso(nextValue);
   };
 
   const handleDigit = (digit: string) => {
@@ -70,7 +85,6 @@ export const Evaluation = () => {
       if (current === 'diastolica') return 'pulso';
       return 'sistolica';
     });
-
     setReplaceOnNextTap(true);
   };
 
@@ -90,6 +104,8 @@ export const Evaluation = () => {
     pulseNum <= 220 &&
     !saving;
 
+  const pressureStatus = classifyPressure(sysNum, diaNum);
+
   const handleSaveMeasurement = async () => {
     if (!canSave) return;
 
@@ -97,15 +113,25 @@ export const Evaluation = () => {
     setError('');
 
     try {
-      await createVitalRecord({
+      const recordedAt = new Date().toISOString();
+      const response = await createVitalRecord({
         systolic_bp: sysNum,
         diastolic_bp: diaNum,
         heart_rate_bpm: pulseNum,
         symptoms: [],
-        recorded_at: new Date().toISOString(),
+        recorded_at: recordedAt,
       });
 
-      navigate('/');
+      navigate('/confirmacion/presion-registrada', {
+        state: {
+          systolic: sysNum,
+          diastolic: diaNum,
+          pulse: pulseNum,
+          statusLabel:
+            response.data?.bp_category_label ?? pressureStatus.statusLabel,
+          recordedAt,
+        },
+      });
     } catch (err: any) {
       setError(
         err.response?.data?.error?.message ||
@@ -118,114 +144,110 @@ export const Evaluation = () => {
 
   return (
     <div className="screen pressure-register-screen">
-      <div className="page-topbar pressure-register-topbar">
+      <div className="pressure-register-topbar">
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="icon-button"
+          className="icon-button pressure-back-btn"
           aria-label="Volver"
         >
-          <ArrowLeft size={20} />
+          <ArrowLeft size={22} />
         </button>
 
-        <h1>Registrar presión</h1>
+        <h1>Registrar Presión</h1>
 
         <span className="pressure-topbar-spacer" aria-hidden="true" />
       </div>
 
-      <section className="pressure-panel">
-        <div className="pressure-values pressure-values--three">
-  <button
-    type="button"
-    className={`pressure-value ${
-      activeField === 'sistolica' ? 'active' : ''
-    }`}
-    onClick={() => handleFieldSelection('sistolica')}
-  >
-    <span>SISTÓLICA</span>
-    <strong>{sistolica}</strong>
-    <small>mmHg</small>
-  </button>
+      <section className="pressure-input-area">
+        <div className="pressure-values-main">
+          <button
+            type="button"
+            className={`pressure-value-card ${
+              activeField === 'sistolica' ? 'active' : ''
+            }`}
+            onClick={() => handleFieldSelection('sistolica')}
+          >
+            <span>SISTÓLICA</span>
+            <strong>{sistolica}</strong>
+            <small>mmHg</small>
+          </button>
 
-  <button
-    type="button"
-    className={`pressure-value ${
-      activeField === 'diastolica' ? 'active' : ''
-    }`}
-    onClick={() => handleFieldSelection('diastolica')}
-  >
-    <span>DIASTÓLICA</span>
-    <strong>{diastolica}</strong>
-    <small>mmHg</small>
-  </button>
+          <button
+            type="button"
+            className={`pressure-value-card ${
+              activeField === 'diastolica' ? 'active' : ''
+            }`}
+            onClick={() => handleFieldSelection('diastolica')}
+          >
+            <span>DIASTÓLICA</span>
+            <strong>{diastolica}</strong>
+            <small>mmHg</small>
+          </button>
+        </div>
 
-  <button
-    type="button"
-    className={`pressure-value pulse-value ${
-      activeField === 'pulso' ? 'active' : ''
-    }`}
-    onClick={() => handleFieldSelection('pulso')}
-  >
-    <span>
-      <Heart size={14} /> PULSO
-    </span>
-    <strong>{pulso}</strong>
-    <small>LPM</small>
-  </button>
-</div>
-
-        
+        <button
+          type="button"
+          className={`pressure-pulse-pill ${activeField === 'pulso' ? 'active' : ''}`}
+          onClick={() => handleFieldSelection('pulso')}
+        >
+          <span>
+            <Heart size={22} fill="currentColor" />
+            Pulso
+          </span>
+          <strong>{pulso}</strong>
+          <small>LPM</small>
+        </button>
       </section>
 
       {error ? (
-        <section className="home-muted-info">{error}</section>
+        <section className="pressure-feedback pressure-feedback--error">
+          <p>{error}</p>
+        </section>
       ) : (
-        <section className="pressure-ok-box">
-          <CheckCircle2 size={18} />
-          <p>
-            Estos valores se guardarán para monitorear el control de la
-            hipertensión.
-          </p>
+        <section className={`pressure-feedback pressure-feedback--${pressureStatus.tone}`}>
+          <CheckCircle2 size={21} />
+          <p>{pressureStatus.label}</p>
         </section>
       )}
 
-      <section className="keypad-card">
-        <div className="keypad-grid">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
-            <button
-              key={digit}
-              type="button"
-              className="keypad-key"
-              onClick={() => handleDigit(digit)}
-            >
-              {digit}
-            </button>
-          ))}
-
+      <section className="pressure-keypad" aria-label="Teclado numérico">
+        {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
           <button
-            type="button"
-            className="keypad-key keypad-key-muted"
-            onClick={handleDelete}
-          >
-            <Undo2 size={18} />
-          </button>
-
-          <button
+            key={digit}
             type="button"
             className="keypad-key"
-            onClick={() => handleDigit('0')}
+            onClick={() => handleDigit(digit)}
           >
-            0
+            {digit}
           </button>
+        ))}
 
-          <button
-            type="button"
-            className="keypad-key keypad-key-main"
-            onClick={handleNextField}
-          >
-            ↵
-          </button>
-        </div>
+        <button
+          type="button"
+          className="keypad-key keypad-key-muted"
+          onClick={handleDelete}
+          aria-label="Borrar"
+        >
+          <Undo2 size={24} />
+        </button>
+
+        <button
+          type="button"
+          className="keypad-key"
+          onClick={() => handleDigit('0')}
+        >
+          0
+        </button>
+
+        <button
+          type="button"
+          className="keypad-key keypad-key-main"
+          onClick={handleNextField}
+          aria-label="Siguiente campo"
+        >
+          ↵
+        </button>
       </section>
 
       <button

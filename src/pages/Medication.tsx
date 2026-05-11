@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -8,14 +8,9 @@ import {
   Plus,
   Minus,
   Utensils,
-  Trash2,
 } from 'lucide-react';
 
-import {
-  createMedication,
-  deleteMedication,
-  getMedications,
-} from '../api/medications.api';
+import { createMedication } from '../api/medications.api';
 
 import { formatTimeDisplayEs } from '../utils/timeDisplay';
 
@@ -38,25 +33,6 @@ export const Medication = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const [medications, setMedications] = useState<any[]>([]);
-  const [loadingList, setLoadingList] = useState(true);
-
-  async function loadMedications() {
-    try {
-      setLoadingList(true);
-
-      const result = await getMedications();
-      setMedications(result.data ?? []);
-    } catch (err: any) {
-      console.error(err);
-    } finally {
-      setLoadingList(false);
-    }
-  }
-
-  useEffect(() => {
-    loadMedications();
-  }, []);
 
   const applySuggestedMedication = (name: string) => {
     setMedicineName(name);
@@ -96,23 +72,26 @@ export const Medication = () => {
       setSaving(true);
       setError('');
 
+      const cleanName = medicineName.trim() || 'Medicamento';
+      const selectedFrequencyHours = frequency === 'interdiario' ? 48 : frequencyHours;
+
       await createMedication({
-        name: medicineName.trim() || 'Medicamento',
+        name: cleanName,
         dose_mg: dose,
-        frequency_hours:
-          frequency === 'interdiario' ? 48 : frequencyHours,
+        frequency_hours: selectedFrequencyHours,
         first_dose_time: firstDoseHHmm,
         with_food: takeWithFood,
       });
 
-      setMedicineName('');
-      setDose(50);
-      setFrequency('diario');
-      setInterval('Cada 24 horas');
-      setFirstDoseHHmm('08:00');
-      setTakeWithFood(true);
-
-      loadMedications();
+      navigate('/confirmacion/medicacion-guardada', {
+        state: {
+          medicationName: cleanName,
+          dose: `${dose}mg`,
+          frequency: selectedFrequencyHours === 48 ? 'Interdiario' : `Cada ${selectedFrequencyHours} horas`,
+          nextDose: `Mañana ${formatTimeDisplayEs(firstDoseHHmm)}`,
+          withFood: takeWithFood,
+        },
+      });
     } catch (err: any) {
       setError(
         err.response?.data?.error?.message ||
@@ -123,21 +102,13 @@ export const Medication = () => {
     }
   };
 
-  const removeMedication = async (id: number) => {
-    try {
-      await deleteMedication(id);
-      loadMedications();
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   return (
     <div className="screen medication-screen">
       <div className="page-topbar medication-topbar">
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={() => navigate('/medicacion')}
           className="icon-button"
         >
           <ArrowLeft size={22} />
@@ -371,58 +342,6 @@ export const Medication = () => {
         </p>
       </section>
 
-      <section className="medication-section">
-        <h2>Medicamentos activos</h2>
-
-        {loadingList ? (
-          <p>Cargando...</p>
-        ) : medications.length === 0 ? (
-          <p>No tienes medicamentos registrados.</p>
-        ) : (
-          medications.map((med) => (
-            <article
-              key={med.id}
-              className="alert-item alert-item--med"
-            >
-              <span className="alert-item-icon">
-                <PillBottle size={26} />
-              </span>
-
-              <div>
-                <h3>{med.name}</h3>
-
-                <p>
-                  {med.dose_mg} mg · Cada{' '}
-                  {med.frequency_hours} horas
-                </p>
-
-                <p>
-                  Primera toma:{' '}
-                  {formatTimeDisplayEs(
-                    med.first_dose_time
-                  )}
-                </p>
-
-                <small>
-                  {med.with_food
-                    ? 'Tomar con comida'
-                    : 'Sin comida'}
-                </small>
-              </div>
-
-              <button
-                type="button"
-                className="icon-button"
-                onClick={() =>
-                  removeMedication(med.id)
-                }
-              >
-                <Trash2 size={18} />
-              </button>
-            </article>
-          ))
-        )}
-      </section>
     </div>
   );
 };

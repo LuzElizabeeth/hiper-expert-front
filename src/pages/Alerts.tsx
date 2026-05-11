@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Bell,
@@ -37,6 +37,7 @@ const dueStatusLabels = {
 };
 
 export const Alerts = () => {
+  const navigate = useNavigate();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [dueMedications, setDueMedications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,10 +71,17 @@ export const Alerts = () => {
   }, []);
 
   async function handleResolve(id: number) {
+    const selectedAlert = alerts.find((alert) => alert.id === id);
+
     try {
       setActionLoadingId(id);
       await resolveAlert(id);
-      setAlerts((current) => current.filter((alert) => alert.id !== id));
+      navigate('/confirmacion/alerta-resuelta', {
+        state: {
+          alertTitle: selectedAlert?.title ?? 'Alerta',
+          alertType: selectedAlert ? alertTypeLabels[selectedAlert.alert_type] : 'Estado actualizado',
+        },
+      });
     } catch (err: any) {
       setError(
         err.response?.data?.error?.message ||
@@ -85,10 +93,17 @@ export const Alerts = () => {
   }
 
   async function handleDismiss(id: number) {
+    const selectedAlert = alerts.find((alert) => alert.id === id);
+
     try {
       setActionLoadingId(id);
       await dismissAlert(id);
-      setAlerts((current) => current.filter((alert) => alert.id !== id));
+      navigate('/confirmacion/alerta-descartada', {
+        state: {
+          alertTitle: selectedAlert?.title ?? 'Alerta',
+          alertType: selectedAlert ? alertTypeLabels[selectedAlert.alert_type] : 'Estado actualizado',
+        },
+      });
     } catch (err: any) {
       setError(
         err.response?.data?.error?.message ||

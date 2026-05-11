@@ -35,10 +35,8 @@ const SettingRow = ({ title, description, checked, onToggle }: SettingRowProps) 
 export const Settings = () => {
   const navigate = useNavigate();
   const [settings, setSettings] = useState<NotificationSettings>(getNotificationSettings());
-  const [savedMessage, setSavedMessage] = useState('');
 
   const toggle = (key: keyof NotificationSettings) => {
-    setSavedMessage('');
     setSettings((current) => ({
       ...current,
       [key]: !current[key],
@@ -46,7 +44,6 @@ export const Settings = () => {
   };
 
   const setAll = (active: boolean) => {
-    setSavedMessage('');
     setSettings({
       criticalAlerts: active,
       aiTrends: active,
@@ -58,13 +55,18 @@ export const Settings = () => {
   };
 
   const resetDefaults = () => {
-    setSavedMessage('');
     setSettings(defaultNotificationSettings);
   };
 
   const handleSave = () => {
     saveNotificationSettings(settings);
-    setSavedMessage('Configuración guardada');
+    const activeSettings = Object.values(settings).filter(Boolean).length;
+    navigate('/confirmacion/notificaciones-guardadas', {
+      state: {
+        activeSettings,
+        totalSettings: Object.keys(settings).length,
+      },
+    });
   };
 
   return (
@@ -163,7 +165,6 @@ export const Settings = () => {
         Guardar configuracion
       </button>
 
-      {savedMessage ? <p className="saved-message">{savedMessage}</p> : null}
     </div>
   );
 };

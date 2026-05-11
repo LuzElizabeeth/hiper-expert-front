@@ -1,54 +1,39 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Bell, ClipboardPlus, HeartPulse,  Home, PillBottle } from 'lucide-react';
+import { Bell, History, Home, PillBottle } from 'lucide-react';
 
 const navItems = [
-  {
-    path: '/',
-    label: 'Inicio',
-    icon: Home,
-  },
- 
-  {
-    path: '/alertas',
-    label: 'Alertas',
-    icon: Bell,
-  },
-   {
-    path: '/evaluacion',
-    label: 'Presión',
-    icon: HeartPulse,
-  },
-  {
-    path: '/medicacion',
-    label: 'Medicación',
-    icon: PillBottle,
-  },
-  
- //   {
- //     path: '/historial',
- //     label: 'Historial',
- //     icon: History,
- //   },
-    
-  {
-    path: '/perfil',
-    label: 'Registro',
-    icon: ClipboardPlus,
-  },
+  { path: '/', label: 'Inicio', icon: Home },
+  { path: '/historial', label: 'Historial', icon: History },
+  { path: '/alertas', label: 'Alertas', icon: Bell },
+  { path: '/medicacion', label: 'Medicación', icon: PillBottle },
 ];
+
+const routesWithoutBottomNav = ['/evaluacion'];
 
 export const BottomNav = () => {
   const location = useLocation();
 
+  if (routesWithoutBottomNav.some((route) => location.pathname.startsWith(route))) {
+    return null;
+  }
+
   return (
-    <nav className="bottom-nav">
+    <nav className="bottom-nav" aria-label="Navegación principal">
       {navItems.map((item) => {
         const Icon = item.icon;
-        const active = location.pathname === item.path;
+        const active =
+          item.path === '/'
+            ? location.pathname === '/'
+            : location.pathname === item.path ||
+              location.pathname.startsWith(`${item.path}/`);
 
         return (
-          <Link key={item.path} to={item.path} className={`nav-item ${active ? 'active' : ''}`}>
-            <Icon className="nav-item-icon" size={26} strokeWidth={2} />
+          <Link
+            key={item.path}
+            to={item.path}
+            className={`nav-item ${active ? 'active' : ''}`}
+          >
+            <Icon className="nav-item-icon" size={26} strokeWidth={2.2} />
             <span>{item.label}</span>
           </Link>
         );

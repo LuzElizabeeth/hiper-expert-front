@@ -28,7 +28,6 @@ export const EmergencyContact = () => {
   const [healthAlerts, setHealthAlerts] = useState(existing?.healthAlerts ?? true);
   const [shareData, setShareData] = useState(existing?.shareData ?? true);
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(existing?.photoDataUrl ?? null);
-  const [savedMessage, setSavedMessage] = useState('');
   const [fileError, setFileError] = useState('');
 
   const relationText = useMemo(() => {
@@ -52,8 +51,10 @@ export const EmergencyContact = () => {
   };
 
   const handleSave = () => {
+    const cleanName = fullName.trim() || 'Contacto de emergencia';
+
     saveEmergencyContact({
-      fullName,
+      fullName: cleanName,
       relation,
       phone,
       healthAlerts,
@@ -61,10 +62,18 @@ export const EmergencyContact = () => {
       hasPhoto: Boolean(photoDataUrl),
       photoDataUrl,
     });
-    setSavedMessage(isEditing ? 'Cambios guardados' : 'Contacto guardado');
+
+    navigate(isEditing ? '/confirmacion/contacto-actualizado' : '/confirmacion/contacto-guardado', {
+      state: {
+        fullName: cleanName,
+        relation: relationText,
+        phone,
+      },
+    });
   };
 
   const handleDelete = () => {
+    const deletedName = fullName.trim() || 'Contacto de emergencia';
     deleteEmergencyContact();
     setFullName('');
     setRelation('hijo');
@@ -72,7 +81,12 @@ export const EmergencyContact = () => {
     setHealthAlerts(true);
     setShareData(true);
     setPhotoDataUrl(null);
-    setSavedMessage('Contacto eliminado');
+
+    navigate('/confirmacion/contacto-eliminado', {
+      state: {
+        fullName: deletedName,
+      },
+    });
   };
 
   const openFilePicker = () => fileRef.current?.click();
@@ -232,8 +246,6 @@ export const EmergencyContact = () => {
             Eliminar Contacto
           </button>
         ) : null}
-
-        {savedMessage ? <p className="saved-message">{savedMessage}</p> : null}
       </section>
     </div>
   );
